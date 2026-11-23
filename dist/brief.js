@@ -26,13 +26,14 @@ function exitPlan(side,stage){
 function saleName(t){return t.part===1?'卖清':'卖一半';}
 function plan(){
  const start=rows.findIndex(r=>r[0]===$('start').value),capital=Number($('capital').value),body=$('planBody');
- if(!(capital>=1&&capital<=1e11)){body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
+ if(!(capital>=1&&capital<=1e11)){body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').dataset.tone='warning';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
  if($('basis').value==='actual'){actualPlan(start,capital);return;}
  const p=simulate(rows,bars,start,capital),q=p.orders,action=q[0],stale=elapsed(shanghai(),rows[end][0])>=8;
  const known=p.watch!==null&&end-p.touch<13,asset=p.side===null?'现金':ASSETS[p.side],round=p.rounds.at(-1);
  const title=action?.kind==='sell'?(q.length===2?'卖清并换边':'旧仓卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
  let why=action?.kind==='sell'?(q.length===2?'上一周已卖出一半。下周收盘卖清，同时用新一轮资金的 20% 买入'+ASSETS[q[1].asset]+'。':'另一边已经确认转强。下周收盘卖出旧仓的一半。'):action?'下一共同交易周收盘，计划投入 '+fmt(p.budget/5)+' 元。':p.side===null?(known?'已经进入观察窗口，等待比值满足 13 周均线条件。':'从所选起点观察，尚无有效建仓信号，保留现金。'):p.count===5?'本轮五笔已到位，等待另一侧入区并确认转强。':'等上一笔成交满 28 天，在首个周收盘检查加仓条件。';
  $('signalLabel').textContent=(stale?'历史参考':'最新周线判断')+'　/　'+(start===end?'本周空仓起步':'按 '+rows[start][0]+' 起步');
+ $('headline').dataset.tone=stale||title.includes('卖')?'warning':title.includes('买入')||title.includes('准备第')?'buy':'neutral';
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'数据已超过一个交易周。请在页末补录后再参考执行单。':why;
  let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':'待买')+'</b><small>'+(lot?rows[lot.i][0]:'20%')+'</small></div>';}
  body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
@@ -57,6 +58,7 @@ function actualPlan(start,capital){
  else{title='等待加仓间隔';note='距离上次成交 '+elapsed(day,last)+' 天，满 28 天后的首个周收盘再次检查。';}
  const stale=elapsed(shanghai(),day)>=8;
  $('signalLabel').textContent='实际持仓核对 · '+(asset===null?'现金':ASSETS[asset]);
+ $('headline').dataset.tone=stale||title.includes('卖')?'warning':title.includes('买入')||title.includes('准备第')?'buy':'neutral';
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'当前记录已超过一个交易周，请先补录最新收盘数据。':note;
  $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps">'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':'待买')+'</b><small>20%</small></div>').join('')+'</div>';
  $('planBody').insertAdjacentHTML('beforeend',exitPlan(asset,half?2:asset!==null&&confirmed&&watch!==asset?1:0));
@@ -69,14 +71,46 @@ function mode(){
  $('capital').value=actual?(get('actual',{}).capital||10000):get('capital',10000);
  save('basis',$('basis').value);plan();
 }
+function changeClass(value){return value>0?'up':value<0?'down':'';}
 function history(){
  const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
- $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong>'+pct(ann)+'</strong></div><div><span>最大回撤</span><strong>'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
+ $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大回撤</span><strong class="'+changeClass(model.draw)+'">'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
  const roundSales=model.rounds.filter(r=>r.sales.length).slice().reverse();
  const dateButton=i=>i===undefined?'待成交':'<button type="button" class="sale-date" data-week="'+i+'">'+rows[i][0]+'</button>';
- $('sales').innerHTML=roundSales.length?'<table><thead><tr><th>卖出旧仓</th><th>卖一半</th><th>卖清剩余</th></tr></thead><tbody>'+roundSales.map(r=>'<tr><td>'+ASSETS[r.asset]+'</td><td>'+dateButton(r.sales[0])+'</td><td>'+dateButton(r.sales[1])+'</td></tr>').join('')+'</tbody></table>':'尚无模拟卖出成交。';
- $('cycles').innerHTML=model.rounds.map((r,j)=>'<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+'<span>'+pct(r.ret)+'</span></summary><p>'+ (r.end===undefined?'持有中，截至 '+rows[end][0]+' 按收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、'))+'</p><div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔收益</th></tr>'+r.lots.map(l=>'<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td>'+pct(l.ret)+'</td></tr>').join('')+'</table></div></details>').join('');
+ $('sales').innerHTML=roundSales.length?'<table><thead><tr><th>卖出旧仓</th><th>卖一半</th><th>卖清剩余</th></tr></thead><tbody>'+roundSales.map(r=>'<tr data-asset="'+r.asset+'"><td>'+ASSETS[r.asset]+'</td><td>'+dateButton(r.sales[0])+'</td><td>'+dateButton(r.sales[1])+'</td></tr>').join('')+'</tbody></table>':'尚无模拟卖出成交。';
+ $('cycles').innerHTML=model.rounds.map((r,j)=>'<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+'<span class="'+changeClass(r.ret)+'">'+pct(r.ret)+'</span></summary><p>'+ (r.end===undefined?'持有中，截至 '+rows[end][0]+' 按收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、'))+'</p><div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔收益</th></tr>'+r.lots.map(l=>'<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(l.ret)+'">'+pct(l.ret)+'</td></tr>').join('')+'</table></div></details>').join('');
+
+ installTableControls();
 }
+function filterSales(){
+ const filter=$('asset-filter').value;
+ for(const row of $('sales').querySelectorAll('tr[data-asset]'))row.hidden=filter!==''&&row.dataset.asset!==filter;
+}
+function installTableControls(){
+ for(const table of $('history').querySelectorAll('table')){
+  for(const th of table.querySelectorAll('th')){
+   const col=th.cellIndex,label=th.textContent,button=document.createElement('button');
+   button.className='sort';button.textContent=label;button.setAttribute('aria-label','按'+label+'排序');
+   th.replaceChildren(button);
+   button.onclick=()=>{
+    const ascending=th.getAttribute('aria-sort')!=='ascending';
+    for(const h of table.querySelectorAll('th'))h.removeAttribute('aria-sort');
+    th.setAttribute('aria-sort',ascending?'ascending':'descending');
+    const body=table.tBodies[0],records=[...body.rows].filter(row=>row.cells[0].tagName==='TD');
+    const key=row=>row.cells[col].textContent.trim();
+    const compare=(a,b)=>{
+     const x=key(a),y=key(b);
+     if(x==='待成交'||y==='待成交')return Number(x==='待成交')-Number(y==='待成交');
+     const n=Number(x.replace(/[,%]/g,'')),m=Number(y.replace(/[,%]/g,''));
+     return (ascending?1:-1)*(Number.isFinite(n)&&Number.isFinite(m)?n-m:x.localeCompare(y,'zh-CN'));
+    };
+    records.sort(compare).forEach(row=>body.append(row));
+   };
+  }
+ }
+ filterSales();
+}
+$('asset-filter').onchange=filterSales;
 function draw(reset=true){
  const el=$('plot'),width=Math.max(275,el.clientWidth),height=el.clientHeight,left=35,right=11,top=34,bottom=26;
  const first=range?Math.max(START,end-range+1):START,visible=bars.slice(first),vals=visible.flatMap(m=>[m.r,m.low,m.high]);
@@ -84,27 +118,41 @@ function draw(reset=true){
  const x=i=>left+(width-left-right)*(i-first)/(end-first),y=v=>top+(height-top-bottom)*(max-v)/(max-min);
  const path=(k,step)=>visible.map((m,j)=>j&&step?'H'+x(first+j)+'V'+y(m[k]):(j?'L':'M')+x(first+j)+' '+y(m[k])).join(' ');
  const cursor=$('cursor');cursor.min=first;cursor.max=end;if(reset)cursor.value=end;const i=+cursor.value;
- let out='';for(let v=min;v<=max+.0001;v+=max-min<=1?.25:.5){out+='<path d="M'+left+' '+y(v)+'H'+(width-right)+'" stroke="#dce3dc"/><text x="0" y="'+(y(v)+4)+'">'+v.toFixed(2)+'</text>';}
- for(const [k,col] of [['low','#b45f57'],['high','#507da7'],['r','#214d43']])out+='<path d="'+path(k,k!=='r')+'" fill="none" stroke="'+col+'" stroke-width="'+(k==='r'?1.8:1.1)+'" '+(k==='r'?'':'stroke-dasharray="4 3"')+'/>';
- for(const r of model.rounds)for(const lot of r.lots){if(lot.i>=first)out+='<circle cx="'+x(lot.i)+'" cy="'+y(bars[lot.i].r)+'" r="3.7" fill="'+(r.asset?'#24669f':'#b4493c')+'" stroke="white" stroke-width="1"/>';}
+ let out='';for(let v=min;v<=max+.0001;v+=max-min<=1?.25:.5){out+='<path d="M'+left+' '+y(v)+'H'+(width-right)+'" stroke="var(--grid)"/><text x="0" y="'+(y(v)+4)+'">'+v.toFixed(2)+'</text>';}
+ for(const [k,col] of [['low','var(--low-line)'],['high','var(--high-line)'],['r','var(--trace)']])out+='<path d="'+path(k,k!=='r')+'" fill="none" stroke="'+col+'" stroke-width="'+(k==='r'?1.8:1.1)+'" '+(k==='r'?'':'stroke-dasharray="4 3"')+'/>';
+ for(const r of model.rounds)for(const lot of r.lots){if(lot.i>=first)out+='<circle cx="'+x(lot.i)+'" cy="'+y(bars[lot.i].r)+'" r="3.7" fill="'+(r.asset?'var(--brand)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';}
  for(const t of model.trades){
   if(t.kind!=='sell'||t.i<first)continue;
   const cx=x(t.i),cy=y(bars[t.i].r),full=t.part===1;
   // Separate adjacent sales vertically; leave the same-week purchase dot visible.
   const tip=cy-(full?23:7);
-  out+='<g data-sale="'+t.i+'"><title>'+rows[t.i][0]+' '+ASSETS[t.asset]+' '+saleName(t)+'</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="#805321"/><path d="M'+(cx-4.8)+' '+(tip-8)+'h9.6l-4.8 8Z" stroke="#805321" stroke-width="1.5" fill="'+(full?'#805321':'white')+'"/></g>';
+  out+='<g data-sale="'+t.i+'"><title>'+rows[t.i][0]+' '+ASSETS[t.asset]+' '+saleName(t)+'</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="var(--amber)"/><path d="M'+(cx-4.8)+' '+(tip-8)+'h9.6l-4.8 8Z" stroke="var(--amber)" stroke-width="1.5" fill="'+(full?'var(--amber)':'var(--surface)')+'"/></g>';
  }
  for(let n=0;n<4;n++){const j=Math.round(first+(end-first)*n/3);out+='<text x="'+x(j)+'" y="'+(height-4)+'" text-anchor="'+(n===0?'start':n===3?'end':'middle')+'">'+rows[j][0].slice(0,7)+'</text>';}
- out+='<path stroke="#779389" stroke-dasharray="2 3" d="M'+x(i)+' '+top+'V'+(height-bottom)+'"/><circle cx="'+x(i)+'" cy="'+y(bars[i].r)+'" r="4" fill="#214d43"/>';
- el.setAttribute('viewBox','0 0 '+width+' '+height);el.innerHTML='<g font-family="sans-serif" font-size="11" fill="#516961">'+out+'</g>';
+ out+='<path stroke="var(--subtle)" stroke-dasharray="2 3" d="M'+x(i)+' '+top+'V'+(height-bottom)+'"/><circle cx="'+x(i)+'" cy="'+y(bars[i].r)+'" r="4" fill="var(--trace)"/>';
+ el.setAttribute('viewBox','0 0 '+width+' '+height);el.innerHTML='<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">'+out+'</g>';
  $('readout').textContent=rows[i][0]+'　比值 '+f(bars[i].r)+'　下线 '+f(bars[i].low)+' / 上线 '+f(bars[i].high);
  const acts=model.trades.filter(t=>t.i===i).map(t=>(t.kind==='buy'?'买入':saleName(t))+ASSETS[t.asset]);
  if(acts.length)$('readout').textContent+='　模拟成交：'+acts.join('，');
 }
 $('ranges').onclick=e=>{if(!e.target.matches('button'))return;range=+e.target.dataset.n;for(const b of $('ranges').children)b.setAttribute('aria-pressed',b===e.target);draw();};
 $('cursor').oninput=()=>draw(false);$('plot').onpointerdown=e=>{const rect=$('plot').getBoundingClientRect(),a=+$('cursor').min;$('cursor').value=e.target.closest('[data-sale]')?.dataset.sale??Math.round(a+(end-a)*Math.min(1,Math.max(0,(e.clientX-rect.left-35)/(rect.width-46))));draw(false);};
+$('plot').onpointermove=e=>{
+ if(e.pointerType==='touch')return;
+ const box=$('plot').getBoundingClientRect(),first=+$('cursor').min;
+ const fraction=Math.min(1,Math.max(0,(e.clientX-box.left-35)/(box.width-46)));
+ const i=Number(e.target.closest('[data-sale]')?.dataset.sale??Math.round(first+(end-first)*fraction));
+ const trades=model.trades.filter(t=>t.i===i).map(t=>(t.kind==='sell'?saleName(t):'买入')+ASSETS[t.asset]);
+ const tip=$('plot-tip');
+ tip.textContent=[rows[i][0]+' · 比值 '+f(bars[i].r),'观察线 '+f(bars[i].low)+' / '+f(bars[i].high),...trades].join('\n');
+ tip.hidden=false;
+ tip.style.left=Math.max(0,Math.min(box.width-tip.offsetWidth,e.clientX-box.left+12))+'px';
+ tip.style.top=Math.max(0,Math.min(box.height-tip.offsetHeight,e.clientY-box.top+12))+'px';
+};
+$('plot').onpointerleave=()=>{$('plot-tip').hidden=true;};
 $('sales').onclick=e=>{
  const button=e.target.closest('button[data-week]');if(!button)return;
+ for(const cell of $('sales').querySelectorAll('.sale-date'))cell.classList.toggle('selected',cell===button);
  const i=+button.dataset.week;
  if(i<+$('cursor').min)$('ranges').querySelector('[data-n="0"]').click();
  $('cursor').value=i;draw(false);$('chart').scrollIntoView({block:'start'});
@@ -127,3 +175,21 @@ $('basis').value=get('basis','model');$('basis').onchange=mode;
 for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='0';plan();};
 if($('basis').value==='actual')$('capital').value=actual.capital||10000;
 refresh();mode();
+
+const navLinks=[...document.querySelectorAll('nav a')];
+function selectNav(hash){
+ for(const link of navLinks){
+  if(link.hash===hash)link.setAttribute('aria-current','location');
+  else link.removeAttribute('aria-current');
+ }
+}
+function visibleSection(){
+ if(window.scrollY<12){selectNav('#top');return;}
+ const hash=location.hash;
+ const ids=['chart','plan','history'];
+ const visible=ids.filter(id=>{const r=$(id).getBoundingClientRect();return r.top<innerHeight*.40 && r.bottom>92;});
+ selectNav(visible.includes(hash.slice(1))?hash:visible.length?'#'+visible.at(-1):$('chart').getBoundingClientRect().top>0?'#top':'');
+}
+addEventListener('scroll',visibleSection,{passive:true});
+addEventListener('hashchange',()=>selectNav(location.hash));
+visibleSection();

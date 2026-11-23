@@ -3,7 +3,10 @@
 const planMoney = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const signedMoney = amount => (amount > 0 ? '+' : amount < 0 ? '−' : '') + '¥' + planMoney.format(Math.abs(amount));
 
+let accountChartObserver;
+
 function clearPlanPerformance() {
+ accountChartObserver?.disconnect();
  $('plan-return').replaceChildren();
  $('plan-lots').replaceChildren();
 }
@@ -24,13 +27,20 @@ function renderPlanPerformance(simulation, start, capital) {
    <div><span>最大回撤</span><strong class="${changeClass(simulation.draw)}">${pct(simulation.draw)}</strong></div>
   </div>
   <p class="meta">以 ${planMoney.format(capital)} 元起步。 ${note}</p>
-  ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}`;
+  ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}
+  <section class="account-trend" aria-labelledby="account-trend-heading">
+   <div class="account-trend-title"><h4 id="account-trend-heading">策略累计收益走势</h4><span>指数模拟 · 周收盘估值</span></div>
+   <svg id="account-plot" role="img" aria-label="从所选起点开始的每周模拟累计收益率"></svg>
+   <div class="account-cursor"><label for="account-week">查看某一周</label><input id="account-week" type="range">
+    <output id="account-readout" for="account-week"></output></div>
+  </section>`;
  const full = $('full-plan');
  if (full) full.onclick = () => {
-  $('start').value = rows[START][0];
+  selectStartWeek(rows[START][0]);
   plan();
   $('start').focus({preventScroll:true});
  };
+ renderAccountTrend(simulation.nav,start,capital);
  renderPlanLots(simulation.rounds);
 }
 
@@ -118,4 +128,82 @@ function renderLotChart(panel, round, lot) {
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
   </svg></div>
   <p class="meta">部分卖出后，已回收现金与剩余持仓一起计入该笔收益。</p>`;
+}
+
+function renderAccountTrend(nav, start, capital) {
+ accountChartObserver?.disconnect();
+ const plot = $('account-plot'), scrub = $('account-week'), readout = $('account-readout');
+ const values = nav.map(value => value/capital-1);
+ const dates = rows.slice(start, start+nav.length).map(row => row[0]);
+ const times = dates.map(date => Date.parse(date));
+ const duration = times.at(-1)-times[0];
+ const axis = yAxis([0,...values]);
+ const drawdowns = [];
+ let peak = capital;
+ for (const value of nav) {
+  peak = Math.max(peak,value);
+  drawdowns.push(value/peak-1);
+ }
+ let selected = nav.length-1, geometry;
+ scrub.min = 0;
+ scrub.max = selected;
+ scrub.value = selected;
+ scrub.disabled = selected===0;
+
+ function showWeek(i) {
+  selected = i;
+  scrub.value = i;
+  const rate = values[i];
+  readout.textContent = dates[i]+' · 累计 '+(rate>0?'+':'')+pct(rate)+' · 账户 ¥'+
+   planMoney.format(nav[i])+' · 回撤 '+pct(drawdowns[i]);
+  const marker = plot.querySelector('.account-marker');
+  marker.setAttribute('transform','translate('+geometry.x(i)+' 0)');
+  marker.querySelector('circle').setAttribute('cy',geometry.y(rate));
+ }
+
+ function draw() {
+  const width = plot.clientWidth, height = plot.clientHeight;
+  if (!width || !height) return;
+  const left = 60, right = width-14, top = 12, bottom = height-26;
+  const x = i => left+(right-left)*(duration?(times[i]-times[0])/duration:.5);
+  const y = v => bottom-(bottom-top)*(v-axis.min)/(axis.max-axis.min);
+  geometry={x,y,left,right};
+  const levels = [...new Set([...axis.ticks,0])];
+  const lines = levels.map(level => `<path d="M${left} ${y(level)}H${right}" stroke="${level===0?'var(--subtle)':'var(--grid)'}"/>
+   <text x="${left-8}" y="${y(level)+4}" text-anchor="end">${Number((100*level).toFixed(1))}%</text>`).join('');
+  const tickCount = Math.min(nav.length,Math.max(2,Math.floor((right-left)/103)+1));
+  const ticks = Array.from({length:tickCount},(_,n)=>{
+   const i = tickCount===1?0:Math.round(n*(nav.length-1)/(tickCount-1));
+   const align = tickCount===1?'middle':n===0?'start':n===tickCount-1?'end':'middle';
+   const label = duration > 200*DAY?dates[i].slice(0,7):dates[i];
+   return `<text x="${x(i)}" y="${height-5}" text-anchor="${align}">${label}</text>`;
+  }).join('');
+  const d = values.map((v,i)=>(i?'L':'M')+x(i)+' '+y(v)).join(' ');
+  plot.setAttribute('viewBox','0 0 '+width+' '+height);
+  plot.innerHTML = `<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">${lines}${ticks}</g>
+   <path d="${d}" stroke="var(--account-ink)" stroke-width="2" fill="none"/>
+   <g class="account-marker" pointer-events="none">
+    <line y1="${top}" y2="${bottom}" stroke="var(--subtle)" stroke-dasharray="3 3"/>
+    <circle r="4" fill="var(--account-ink)" stroke="var(--surface)" stroke-width="1"/>
+   </g>`;
+  showWeek(selected);
+ }
+
+ function inspect(e) {
+  if (!geometry) return;
+  const box = plot.getBoundingClientRect();
+  const fraction = keepBetween((e.clientX-box.left-geometry.left)/(geometry.right-geometry.left),0,1);
+  const time = times[0]+duration*fraction;
+  let i = times.findIndex(t=>t>=time);
+  if (i<0) i=times.length-1;
+  if (i && time-times[i-1]<times[i]-time) i--;
+  showWeek(i);
+ }
+
+ scrub.oninput = () => showWeek(Number(scrub.value));
+ plot.onpointermove = e => { if (e.pointerType!=='touch') inspect(e); };
+ plot.onpointerdown = inspect;
+ draw();
+ accountChartObserver = new ResizeObserver(draw);
+ accountChartObserver.observe(plot);
 }

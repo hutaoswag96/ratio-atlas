@@ -140,7 +140,7 @@ function renderTrendCharts() {
   ] : [
    { values: indices.map(i => bars[i].low), color: 'var(--low-line)', step: true, dashed: true },
    { values: indices.map(i => bars[i].high), color: 'var(--high-line)', step: true, dashed: true },
-   { values: indices.map(i => bars[i].r), color: 'var(--trace)' }
+   { values: indices.map(i => bars[i].r), color: 'var(--ratio-ink)' }
   ];
   const axis = yAxis(series.flatMap(line => line.values));
   const y = value => p.base - (p.base - view.top) * (value - axis.min) / (axis.max - axis.min);
@@ -167,7 +167,7 @@ function renderTrendCharts() {
   p.el.setAttribute('viewBox', '0 0 '+p.width+' '+p.height);
   p.el.innerHTML = '<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">'+svg+
    '</g><g class="week-marker" pointer-events="none"><line stroke="var(--subtle)" stroke-dasharray="3 3"/>'+
-   '<circle r="3.8"/>'+(view.index?'<circle r="3.8"/>':'')+'</g>';
+   (view.index?'<circle r="3.8"/><circle r="3.8"/>':'<rect class="ratio-diamond" x="-4" y="-4" width="8" height="8"/>')+'</g>';
  }
  updateTrendReadouts(hoverWeek ?? markedWeek);
 }
@@ -213,8 +213,13 @@ function updateTrendReadouts(week) {
   const line = marker.querySelector('line');
   line.setAttribute('y1', view.top);
   line.setAttribute('y2', p.base);
-  const values = view.index ? [normalizedPoint(week, 1), normalizedPoint(week, 2)] : [bar.r];
-  const colors = view.index ? ['var(--up)','var(--brand)'] : ['var(--trace)'];
+  const diamond = marker.querySelector('.ratio-diamond');
+  if (diamond) {
+   diamond.setAttribute('transform', 'translate(0 '+view.y(bar.r)+') rotate(45)');
+   continue;
+  }
+  const values = [normalizedPoint(week, 1), normalizedPoint(week, 2)];
+  const colors = ['var(--up)','var(--brand)'];
   marker.querySelectorAll('circle').forEach((dot, i) => {
    dot.setAttribute('cy', view.y(values[i]));
    dot.setAttribute('fill', colors[i]);

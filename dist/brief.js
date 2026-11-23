@@ -1,185 +1,100 @@
 'use strict';
-const $ = id => document.getElementById(id);
-const rows = StyleLens.build(weeklyData);
-const last = rows.length-1;
-const names = ['红利观察区','中间区','创业板观察区'];
-const fmt = n => n.toFixed(3);
-const signed = (n,digits=1) => (n>0?'+':'')+(100*n).toFixed(digits);
-const pct = n => signed(n)+'%';
-let adjustment=0, userPortfolio=false;
-let asOf = last, years = 3, selectedZone = rows[last].zone, listLimit = 5, historySets;
-
-// Freeze every past opinion at the information available on the issue date.
-const tiltCount=[];
-let totalTilts=0;
-for(let i=StyleLens.lookback;i<rows.length;i++){
-  const z=rows[i].zone;
-  if(z!==1){
-    const evidence=StyleLens.cases(rows,i,26)[z];
-    if(StyleLens.decision(rows,i,evidence).allocation!==50)totalTilts++;
-  }
-  tiltCount[i]=totalTilts;
+const $=id=>document.getElementById(id), f=n=>n.toFixed(3), fmt=n=>Math.round(n).toLocaleString('zh-CN'), pct=n=>(100*n).toFixed(2)+'%';
+function get(key,alt){try{return JSON.parse(localStorage.getItem('rotation1:'+key))??alt}catch{return alt}}
+function save(key,v){try{localStorage.setItem('rotation1:'+key,JSON.stringify(v));return true}catch{return false}}
+const shanghai=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+let extra=get('rows',[]),rows,bars,model,end,range=0;
+function validRow(r){return Array.isArray(r)&&r.length===5&&/^\d{4}-\d\d-\d\d$/.test(r[0])&&r.slice(1).every(n=>Number.isFinite(n)&&n>0);}
+if(!Array.isArray(extra))extra=[];
+extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
+function refresh(){
+ rows=[...weeklyData,...extra];bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
+ const m=bars[end];$('asof').textContent=rows[end][0];$('ratio').textContent=f(m.r);$('lo').textContent='红利线 '+f(m.low);$('hi').textContent='创业板线 '+f(m.high);
+ const span=m.high-m.low;$('pointer').style.left=Math.max(0,Math.min(99,20+60*(m.r-m.low)/span))+'%';
+ $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
+ const selected=$('start').value||get('start',rows[end][0]);$('start').replaceChildren(...rows.slice(START).map((r,j)=>new Option(r[0],r[0])).reverse());
+ $('start').value=rows.some((r,i)=>i>=START&&r[0]===selected)?selected:rows[end][0];save('start',$('start').value);
+ $('undo').disabled=!extra.length;draw();plan();history();
 }
-const yuan = n => '¥'+Math.round(n).toLocaleString('zh-CN');
-function loadExample(){
-  const now=rows[asOf],start=rows[asOf-4];userPortfolio=false;
-  $('holdA').value=Math.round(50000*now.a/start.a);
-  $('holdB').value=Math.round(50000*now.b/start.b);
-  $('newCash').value=10000;$('baseline').value=50;
-  $('exampleNote').textContent='示例假设四周前各持有 5 万元，按价格指数涨跌估算当前市值，本周计划增加 1 万元。可直接修改。';
-  allocate();
+function plan(){
+ const start=rows.findIndex(r=>r[0]===$('start').value),capital=Number($('capital').value),body=$('planBody');
+ if(!(capital>=1&&capital<=1e11)){body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
+ if($('basis').value==='actual'){actualPlan(start,capital);return;}
+ const p=simulate(rows,bars,start,capital),q=p.orders,action=q[0],stale=elapsed(shanghai(),rows[end][0])>=8;
+ const known=p.watch!==null&&end-p.touch<13,asset=p.side===null?'现金':ASSETS[p.side],round=p.rounds.at(-1);
+ const title=action?.kind==='sell'?(q.length===2?'卖清并换边':'旧仓卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
+ let why=action?.kind==='sell'?(q.length===2?'上一周已卖出一半。下周收盘卖清，同时用新一轮资金的 20% 买入'+ASSETS[q[1].asset]+'。':'另一边已经确认转强。下周收盘卖出旧仓的一半。'):action?'下一共同交易周收盘，计划投入 '+fmt(p.budget/5)+' 元。':p.side===null?(known?'已经进入观察窗口，等待比值满足 13 周均线条件。':'从所选起点观察，尚无有效建仓信号，保留现金。'):p.count===5?'本轮五笔已到位，等待另一侧入区并确认转强。':'等上一笔成交满 28 天，在首个周收盘检查加仓条件。';
+ $('signalLabel').textContent=(stale?'历史参考':'最新周线判断')+'　/　'+(start===end?'本周空仓起步':'按 '+rows[start][0]+' 起步');
+ $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'数据已超过一个交易周。请在页末补录后再参考执行单。':why;
+ let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':'待买')+'</b><small>'+(lot?rows[lot.i][0]:'20%')+'</small></div>';}
+ body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
+ save('capital',capital);save('start',$('start').value);
 }
-function allocate(){
-  const inputs=['holdA','holdB','newCash','baseline'].map(id=>$(id));
-  if(inputs.some(el=>!el.value||!el.validity.valid||!Number.isFinite(el.valueAsNumber))){
-    $('split').textContent='请检查输入';$('splitNote').textContent='金额须为非负数，原定占比须在 0% 至 100% 之间。';return;
-  }
-  const [a,b,extra,original]=inputs.map(el=>el.valueAsNumber);
-  const goal=Math.max(0,Math.min(100,original+adjustment))/100;
-  const total=a+b+extra, red=Math.min(extra,Math.max(0,total*goal-a)),growth=extra-red;
-  $('split').textContent='红利 '+yuan(red)+' · 创业板 '+yuan(growth);
-  $('splitNote').textContent='红利目标占比 '+(goal*100).toFixed(1)+'%。'+(total>0?'投入后约为 '+((a+red)/total*100).toFixed(1)+'%。':'')+'仅分配新增资金，原有份额继续持有。金额按元显示。';
+function actualPlan(start,capital){
+ const raw=$('holding').value,asset=raw===''?null:Number(raw),filled=asset===null?0:Number($('filled').value);
+ const last=$('lastFill').value,half=asset!==null&&$('sold').value==='1',m=bars[end],day=rows[end][0];
+ for(const id of ['filled','lastFill','sold'])$(id).disabled=asset===null;
+ let touch=end;
+ while(touch>=Math.max(start,end-12)&&bars[touch].zone===null)touch--;
+ const watch=touch>=Math.max(start,end-12)?bars[touch].zone:null;
+ const confirmed=watch!==null&&(watch===0?m.r>m.avg:m.r<m.avg);
+ let title,note;
+ if(half){title='卖清旧仓并换边';note='你已记录本周按换仓信号卖出一半。下一共同交易周收盘卖清，同时按届时账户总额的 20% 买入'+ASSETS[1-asset]+'。';}
+ else if(asset!==null&&confirmed&&watch!==asset){title='卖出'+ASSETS[asset]+'的一半';note='对侧已入区并确认转强。下一共同周收盘先卖一半，再下一周卖清并开始新一轮。';}
+ else if(asset===null){title=confirmed?'开始买入'+ASSETS[watch]:'空仓等待';note=confirmed?'下一共同周收盘买入第一份，预算约 '+fmt(capital/5)+' 元。':'从所选起点观察，本周未同时满足入区和转强条件。';}
+ else if(filled===5){title='继续持有'+ASSETS[asset];note='本轮五笔已买完，等待对侧确认。';}
+ else if(!last||last>day){title='补全最近买入日';note='请填写不晚于数据截止日的实际成交日期，用来判断是否已满 28 天。';}
+ else if(elapsed(day,last)>=28){title='准备第 '+(filled+1)+' 笔';note='距离上次买入已满 28 天。若此前没有待成交指令，按本周检查结果，下一共同周收盘买入'+ASSETS[asset]+'约 '+fmt(capital/5)+' 元。';}
+ else{title='等待加仓间隔';note='距离上次成交 '+elapsed(day,last)+' 天，满 28 天后的首个周收盘再次检查。';}
+ const stale=elapsed(shanghai(),day)>=8;
+ $('signalLabel').textContent='实际持仓核对 · '+(asset===null?'现金':ASSETS[asset]);
+ $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'当前记录已超过一个交易周，请先补录最新收盘数据。':note;
+ $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps">'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':'待买')+'</b><small>20%</small></div>').join('')+'</div>';
+ save('actual',{raw,filled,last,half,capital,day});save('start',$('start').value);
 }
-for(const id of ['holdA','holdB','newCash','baseline'])$(id).oninput=()=>{userPortfolio=true;$('exampleNote').textContent='正在使用你输入的持仓与计划，仅用于本页试算。';allocate();};
-$('example').onclick=loadExample;
-function drawDial(row){
-  const cx=170,cy=136, radius=109;
-  function point(f,r){
-    const angle=Math.PI*(1-f);
-    return [cx+r*Math.cos(angle),cy-r*Math.sin(angle)];
-  }
-  const coord = (f,r) => point(f,r).map(n=>n.toFixed(2)).join(' ');
-  function arc(start,end,r,color,width){
-    return '<path d="M '+coord(start,r)+' A '+r+' '+r+' 0 0 1 '+coord(end,r)+'" fill="none" stroke="'+color+'" stroke-width="'+width+'"/>';
-  }
-  let s=arc(0,.198,radius,'#9faac1',13)+arc(.202,.798,radius,'#80729c',13)+arc(.802,1,radius,'#d8b896',13);
-  for(let i=0;i<=50;i++){
-    const f=i/50;
-    s+='<path d="M '+coord(f,119)+' L '+coord(f,i%5===0?127:122)+'" stroke="#978fa7" stroke-width="1"/>';
-  }
-  s+='<path d="M '+coord(row.rank,94)+' L '+coord(row.rank,121)+'" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>';
-  const [dx,dy]=point(row.rank,109);
-  s+='<circle cx="'+dx+'" cy="'+dy+'" r="4.5" fill="#fff"/>';
-  s+='<text x="170" y="101" text-anchor="middle" fill="#fff" font-size="44" font-family="Georgia,serif">'+(row.rank*100).toFixed(1)+'</text><text x="170" y="126" text-anchor="middle" fill="#d6d0e3" font-size="13">历史百分位</text>';
-  $('dial').innerHTML='<svg viewBox="0 0 340 145" role="img" aria-label="比值位于此前156周第'+(row.rank*100).toFixed(1)+'百分位">'+s+'</svg>';
+function mode(){
+ const actual=$('basis').value==='actual';
+ $('actualFields').hidden=!actual;$('fundLabel').textContent=actual?'本轮起始资金（元）':'初始资金（元）';
+ $('planHelp').textContent=actual?'填写实际成交情况，按最新周收盘核对下一步。手动核对模式不会替你记录成交；每周请核实已买笔数、成交日及换仓进度。':'从所选周空仓起步，逐周按规则模拟。未完全跟随历史交易时，请选择按实际持仓核对。';
+ $('capital').value=actual?(get('actual',{}).capital||10000):get('capital',10000);
+ save('basis',$('basis').value);plan();
 }
-
-function renderReport(){
-  const row=rows[asOf],prev=rows[asOf-1],before=rows[asOf-4];
-  const baseCases=StyleLens.cases(rows,asOf,26);
-  const advice=StyleLens.decision(rows,asOf,baseCases[row.zone]);
-  adjustment=advice.allocation-50;
-  if(!userPortfolio)loadExample();else allocate();
-  $('verdict').textContent=advice.title;
-  $('reason').textContent=row.zone===1?'本周比值 '+fmt(row.r)+'，位于近三年的中间区。比值降至 '+fmt(row.low)+' 时关注红利，升至 '+fmt(row.high)+' 时关注创业板。':advice.reason;
-  $('action').textContent=advice.action;
-  $('ruleAudit').textContent='截至本报告周，逐周回看 '+(asOf-StyleLens.lookback+1)+' 期，其中 '+tiltCount[asOf]+' 期满足倾斜条件。此数按报告周计，相邻周可能属于同一阶段。';
-  $('rank').textContent=names[row.zone]; drawDial(row);
-  $('week').value=String(asOf);$('prev').disabled=asOf===StyleLens.lookback;
-  $('next').disabled=asOf===last;$('latest').hidden=asOf===last;
-  $('ratio').textContent=fmt(row.r);$('weeklyChange').textContent='本周 '+pct(row.r/prev.r-1);
-  const a=row.a/before.a-1,b=row.b/before.b-1,span=Math.max(.01,Math.abs(a),Math.abs(b));
-  $('driverDates').textContent=before.date+' 至 '+row.date;
-  $('moves').innerHTML=[['中证红利','000922',a],['创业板指','399006',b]].map(([name,code,value],i)=>
-    '<div class="mover"><b>'+name+'<small>'+code+'</small></b><strong>'+pct(value)+'</strong></div><div class="bar"><i class="'+(i?'growth':'')+'" style="width:'+Math.abs(value)/span*100+'%"></i></div>').join('');
-  const explanation=a>=0&&b<0?'红利上涨、创业板下跌，两边共同抬高了比值。':
-    b>=0&&a<0?'创业板上涨、红利下跌，两边共同压低了比值。':
-    a>=0&&b>=0?(a>=b?'两项指数均上涨，红利涨得更多。':'两项指数均上涨，创业板涨得更多。'):
-    a>=b?'两项指数均下跌，红利跌幅较小。':'两项指数均下跌，创业板跌幅较小。';
-  $('driverText').textContent=explanation+'同期比值变动 '+pct(row.r/before.r-1)+'。';
-  $('coverage').textContent='快照包含 '+rows[0].date+' 至 '+rows[last].date+' 的 '+rows.length+' 条共同周收盘。周报可从 '+rows[StyleLens.lookback].date+' 起回看。近四周比较采用相隔四条周线的收盘点位。';
-  renderPlot();renderEvidence(baseCases);
+function history(){
+ const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
+ $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong>'+pct(ann)+'</strong></div><div><span>最大回撤</span><strong>'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
+ $('cycles').innerHTML=model.rounds.map((r,j)=>'<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+'<span>'+pct(r.ret)+'</span></summary><p>'+ (r.end===undefined?'持有中，截至 '+rows[end][0]+' 按收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、'))+'</p><div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔收益</th></tr>'+r.lots.map(l=>'<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td>'+pct(l.ret)+'</td></tr>').join('')+'</table></div></details>').join('');
 }
-function renderPlot(){
-  const end=rows[asOf];
-  const data=rows.slice(0,asOf+1).filter(p=>years===0||p.time>=end.time-years*31557600000);
-  const calibrated=data.filter(p=>p.zone!==null);
-  $('range').innerHTML=[1,3,5,0].map(v=>'<button data-years="'+v+'" aria-pressed="'+(years===v)+'">'+(v?v+' 年':'全部')+'</button>').join('');
-  const w=Math.max(250,$('plot').clientWidth),h=w<450?202:222,pad={left:36,right:9,top:14,bottom:28};
-  const vals=data.map(p=>p.r).concat(calibrated.flatMap(p=>[p.low,p.high]));
-  const floor=Math.min(...vals),ceil=Math.max(...vals),span=ceil-floor||1;
-  const lo=floor-span*.08,hi=ceil+span*.08;
-  const first=data[0].time;
-  const x=p=>pad.left+(p.time-first)/(end.time-first)*(w-pad.left-pad.right);
-  const y=v=>pad.top+(hi-v)/(hi-lo)*(h-pad.bottom-pad.top);
-  const points=(items,field)=>items.map(p=>x(p).toFixed(2)+' '+y(p[field]).toFixed(2));
-  const line=(items,field)=>'M '+points(items,field).join(' L ');
-  let s='';
-  if(calibrated.length){
-    s+='<path fill="#efebf7" d="'+line(calibrated,'high')+' L '+points([...calibrated].reverse(),'low').join(' L ')+' Z"/>';
-    for(const field of ['high','low'])s+='<path fill="none" stroke="#c0b4d9" stroke-dasharray="3 4" d="'+line(calibrated,field)+'"/>';
-  }
-  const ticks=4;
-  for(let i=0;i<=ticks;i++){
-    const v=lo+(hi-lo)*i/ticks;
-    s+='<path d="M '+pad.left+' '+y(v)+' H '+(w-pad.right)+'" stroke="#c8c9ce" opacity=".48"/><text x="'+(pad.left-5)+'" y="'+(y(v)+4)+'" text-anchor="end">'+v.toFixed(2)+'</text>';
-  }
-  const dates=w<440?3:5;
-  for(let k=0;k<dates;k++){
-    const i=Math.round((data.length-1)*k/(dates-1)),p=data[i];
-    s+='<text x="'+x(p)+'" y="'+(h-5)+'" text-anchor="'+(k===0?'start':k===dates-1?'end':'middle')+'">'+p.date.slice(0,7)+'</text>';
-  }
-  s+='<path fill="none" stroke="#6950a5" stroke-width="2.4" stroke-linejoin="round" d="'+line(data,'r')+'"/><circle cx="'+x(end)+'" cy="'+y(end.r)+'" r="4" fill="#6950a5" stroke="white" stroke-width="1.5"/>';
-  $('plot').innerHTML='<div class="plotbox" tabindex="0" aria-label="比值图，可用左右方向键查看读数"><svg viewBox="0 0 '+w+' '+h+'" role="img" aria-label="红利除以创业板的价格比值和滚动观察区间" font-family="monospace" font-size="12" fill="#606572">'+s+'<line y1="'+pad.top+'" y2="'+(h-pad.bottom)+'" stroke="#56456f" stroke-dasharray="2 3" visibility="hidden"/></svg><output hidden></output></div>';
-  const box=$('plot').firstChild,tip=box.lastChild,cursor=box.querySelector('line');
-  let index=data.length-1;
-  function show(i){
-    index=Math.max(0,Math.min(data.length-1,i));const p=data[index];
-    tip.textContent=p.date+' · '+fmt(p.r)+(p.zone===null?'':' · '+names[p.zone]);tip.hidden=false;
-    tip.style.left=Math.max(0,Math.min(w-tip.offsetWidth,x(p)-70))+'px';
-    cursor.setAttribute('x1',x(p));cursor.setAttribute('x2',x(p));cursor.setAttribute('visibility','visible');
-  }
-  box.onpointermove=box.onpointerdown=e=>{
-    const time=first+((e.clientX-box.getBoundingClientRect().left-pad.left)/(w-pad.left-pad.right))*(end.time-first);
-    const nearest=data.reduce((best,p,i)=>Math.abs(p.time-time)<Math.abs(data[best].time-time)?i:best,0);
-    show(nearest);
-  };
-  box.onfocus=()=>show(index);box.onblur=box.onpointerleave=()=>{tip.hidden=true;cursor.setAttribute('visibility','hidden');};
-  box.onkeydown=e=>{if(['ArrowRight','ArrowLeft'].includes(e.key)){e.preventDefault();show(index+(e.key==='ArrowRight'?1:-1));}};
+function draw(reset=true){
+ const el=$('plot'),width=Math.max(275,el.clientWidth),height=el.clientHeight,left=35,right=11,top=15,bottom=26;
+ const first=range?Math.max(START,end-range+1):START,visible=bars.slice(first),vals=visible.flatMap(m=>[m.r,m.low,m.high]);
+ const min=Math.floor((Math.min(...vals)-.08)*4)/4,max=Math.ceil((Math.max(...vals)+.08)*4)/4;
+ const x=i=>left+(width-left-right)*(i-first)/(end-first),y=v=>top+(height-top-bottom)*(max-v)/(max-min);
+ const path=(k,step)=>visible.map((m,j)=>j&&step?'H'+x(first+j)+'V'+y(m[k]):(j?'L':'M')+x(first+j)+' '+y(m[k])).join(' ');
+ const cursor=$('cursor');cursor.min=first;cursor.max=end;if(reset)cursor.value=end;const i=+cursor.value;
+ let out='';for(let v=min;v<=max+.0001;v+=max-min<=1?.25:.5){out+='<path d="M'+left+' '+y(v)+'H'+(width-right)+'" stroke="#dce3dc"/><text x="0" y="'+(y(v)+4)+'">'+v.toFixed(2)+'</text>';}
+ for(const [k,col] of [['low','#b45f57'],['high','#507da7'],['r','#214d43']])out+='<path d="'+path(k,k!=='r')+'" fill="none" stroke="'+col+'" stroke-width="'+(k==='r'?1.8:1.1)+'" '+(k==='r'?'':'stroke-dasharray="4 3"')+'/>';
+ for(const r of model.rounds)for(const lot of r.lots){if(lot.i>=first)out+='<circle cx="'+x(lot.i)+'" cy="'+y(bars[lot.i].r)+'" r="3.7" fill="'+(r.asset?'#24669f':'#b4493c')+'" stroke="white" stroke-width="1"/>';}
+ for(let n=0;n<4;n++){const j=Math.round(first+(end-first)*n/3);out+='<text x="'+x(j)+'" y="'+(height-4)+'" text-anchor="'+(n===0?'start':n===3?'end':'middle')+'">'+rows[j][0].slice(0,7)+'</text>';}
+ out+='<path stroke="#779389" stroke-dasharray="2 3" d="M'+x(i)+' '+top+'V'+(height-bottom)+'"/><circle cx="'+x(i)+'" cy="'+y(bars[i].r)+'" r="4" fill="#214d43"/>';
+ el.setAttribute('viewBox','0 0 '+width+' '+height);el.innerHTML='<g font-family="sans-serif" font-size="11" fill="#516961">'+out+'</g>';
+ $('readout').textContent=rows[i][0]+'　比值 '+f(bars[i].r)+'　下线 '+f(bars[i].low)+' / 上线 '+f(bars[i].high);
 }
-function renderEvidence(baseCases){
-  const horizon=Number($('horizon').value);
-  historySets=horizon===26&&baseCases?baseCases:StyleLens.cases(rows,asOf,horizon);
-  const row=rows[asOf];
-  $('casecards').innerHTML=historySets.map((samples,z)=>{
-    const stat=StyleLens.summary(samples,z===2?'b':'a'),asset=z===2?'创业板':'红利';
-    const threshold=z===0?'≤ '+fmt(row.low):z===2?'≥ '+fmt(row.high):fmt(row.low)+' – '+fmt(row.high);
-    return '<button class="casecard" aria-pressed="'+(z===selectedZone)+'" data-zone="'+z+'"><div class="cardhead">'+names[z]+'<small>本周 '+threshold+'</small></div><div><strong>'+(stat?stat.wins:'0')+' / '+samples.length+'</strong><span>'+asset+'跑赢</span></div><p class="detail">'+(stat?'收益差中位数 '+signed(stat.median)+' 个百分点':'截至该周暂无完整样本')+'</p></button>';
-  }).join('');
-  const lower=StyleLens.summary(historySets[0],'a'), upper=StyleLens.summary(historySets[2],'b');
-  let finding='观察区需要更多到期案例。';
-  if(lower && upper){
-    finding='在 '+horizon+' 周观察期里，'+
-      (lower.median<=0&&upper.median<=0?'两侧进入相对低位后，收益差中位数都未转正。仅凭“过去跌得多”就换仓，缺少历史支持。':'两侧的结果应分别判断。样本数量和典型收益差会随观察期改变，跑赢另一项指数也可能亏钱。');
-  }
-  $('takeaway').textContent=finding;
-  drawTable();
-}
-function drawTable(){
-  const samples=historySets[selectedZone];
-  $('sampleTitle').textContent=names[selectedZone]+'的历史案例';
-  $('sampleDate').textContent='截至 '+rows[asOf].date+' · '+samples.length+' 组';
-  $('records').innerHTML=[...samples].reverse().slice(0,listLimit).map(e=>'<tr><td>'+rows[e.i].date+'</td><td>'+fmt(rows[e.i].r)+'</td><td>'+pct(e.a)+'</td><td>'+pct(e.b)+'</td><td>'+signed(e.spread)+'</td><td><button class="textlink" data-week="'+e.i+'">当周判断</button></td></tr>').join('')||'<tr><td colspan="6" style="text-align:center">截至此周，尚无已到期且符合条件的案例。</td></tr>';
-  $('more').hidden=samples.length<=listLimit;
-}
-function setWeek(i){
-  asOf=Math.min(last,Math.max(StyleLens.lookback,i));
-  selectedZone=rows[asOf].zone;listLimit=5;renderReport();
-}
-$('week').innerHTML=rows.slice(StyleLens.lookback).map((p,i)=>'<option value="'+(i+StyleLens.lookback)+'">'+p.date+'</option>').reverse().join('');
-$('week').onchange=e=>setWeek(Number(e.target.value));$('prev').onclick=()=>setWeek(asOf-1);
-$('next').onclick=()=>setWeek(asOf+1);$('latest').onclick=()=>setWeek(last);
-$('range').onclick=e=>{if(e.target.dataset.years!==undefined){years=Number(e.target.dataset.years);renderPlot();}};
-$('casecards').onclick=e=>{const btn=e.target.closest('[data-zone]');if(btn){selectedZone=Number(btn.dataset.zone);listLimit=5;renderEvidence();$('casecards').querySelector('[data-zone="'+selectedZone+'"]').focus({preventScroll:true});}};
-$('horizon').onchange=()=>{listLimit=5;renderEvidence();};
-$('more').onclick=()=>{listLimit+=10;drawTable();};
-$('records').onclick=e=>{if(e.target.dataset.week!==undefined){setWeek(Number(e.target.dataset.week));$('week').focus({preventScroll:true});$('judgment').scrollIntoView();}};
-function markNav(){
-  const sections=['judgment','trend','evidence'];
-  const active=sections.filter(id=>$(id).getBoundingClientRect().top<innerHeight*.30).pop()||sections[0];
-  document.querySelectorAll('nav a').forEach(a=>{a.classList.toggle('active',a.hash==='#'+active);});
-}
-document.querySelector('.methodlink').onclick=()=>$('methodDetails').open=true;
-let timer;window.addEventListener('resize',()=>{clearTimeout(timer);timer=setTimeout(renderPlot,100);});
-window.addEventListener('scroll',markNav,{passive:true});
-renderReport();markNav();
+$('ranges').onclick=e=>{if(!e.target.matches('button'))return;range=+e.target.dataset.n;for(const b of $('ranges').children)b.setAttribute('aria-pressed',b===e.target);draw();};
+$('cursor').oninput=()=>draw(false);$('plot').onpointerdown=e=>{const rect=$('plot').getBoundingClientRect(),a=+$('cursor').min;$('cursor').value=Math.round(a+(end-a)*Math.min(1,Math.max(0,(e.clientX-rect.left-35)/(rect.width-46))));draw(false);};
+$('start').onchange=plan;$('capital').value=get('capital',10000);$('capital').oninput=plan;
+new ResizeObserver(()=>{if(bars)draw(false)}).observe($('plot'));
+function monday(s){const n=new Date(s+'T00:00:00Z');return +n-(n.getUTCDay()+6)%7*DAY;}
+$('append').onsubmit=e=>{
+ e.preventDefault();const day=$('newDay').value,prior=rows[end][0],r=[day,...[0,1,2,3].map(j=>Number($('p'+j).value))];
+ const delta=(monday(day)-monday(prior))/DAY,weekday=new Date(day).getUTCDay(),china=new Date(Date.now()+8*3600000);
+ const friday=monday(day)+4*DAY+15*3600000;
+ if(!validRow(r)||!weekday||weekday===6||delta<7||delta>14||day>shanghai()||+china<friday){$('notice').textContent='请填写紧接上一条记录的已结束交易周及四个正数点位。整周休市可跳过一周。';return;}
+ extra.push(r);$('sold').value='0';const stored=save('rows',extra);refresh();e.target.reset();$('notice').textContent=stored?'已补录，判断与历史记录已重新计算。':'本次页面已更新，浏览器未允许保存。';
+};
+$('undo').onclick=()=>{extra.pop();save('rows',extra);refresh();$('notice').textContent='已撤回最后一次补录。';};
+const actual=get('actual',{});$('holding').value=actual.raw??'';$('filled').value=actual.filled||1;$('lastFill').value=actual.last||'';
+$('sold').value=actual.half&&actual.day===(extra.at(-1)||weeklyData.at(-1))[0]?'1':'0';
+$('basis').value=get('basis','model');$('basis').onchange=mode;
+for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='0';plan();};
+if($('basis').value==='actual')$('capital').value=actual.capital||10000;
+refresh();mode();

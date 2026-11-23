@@ -137,7 +137,7 @@ function renderTrendCharts() {
   const p = makePlot(view);
   const series = view.index ? [
    { values: indices.map(i => normalizedPoint(i, 1)), color: 'var(--up)' },
-   { values: indices.map(i => normalizedPoint(i, 2)), color: 'var(--brand)', dashed: true }
+   { values: indices.map(i => normalizedPoint(i, 2)), color: 'var(--blue)', dashed: true }
   ] : [
    { values: indices.map(i => bars[i].low), color: 'var(--low-line)', step: true, dashed: true },
    { values: indices.map(i => bars[i].high), color: 'var(--high-line)', step: true, dashed: true },
@@ -178,7 +178,7 @@ function tradeMarkers(plot, y, first, last) {
  for (const trade of model.trades) {
   if (trade.i < first || trade.i > last || trade.kind !== 'buy') continue;
   svg += '<circle data-week="'+trade.i+'" cx="'+plot.x(trade.i)+'" cy="'+y(bars[trade.i].r)+
-   '" r="3.7" fill="'+(trade.asset?'var(--brand)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';
+   '" r="3.7" fill="'+(trade.asset?'var(--blue)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';
  }
  for (const trade of model.trades) {
   if (trade.i < first || trade.i > last || trade.kind !== 'sell') continue;
@@ -224,7 +224,7 @@ function updateTrendReadouts(week) {
    continue;
   }
   const values = [normalizedPoint(week, 1), normalizedPoint(week, 2)];
-  const colors = ['var(--up)','var(--brand)'];
+  const colors = ['var(--up)','var(--blue)'];
   marker.querySelectorAll('circle').forEach((dot, i) => {
    dot.setAttribute('cy', view.y(values[i]));
    dot.setAttribute('fill', colors[i]);

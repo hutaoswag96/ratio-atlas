@@ -1,10 +1,42 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101c30"><title>比值手记 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
-<header><div class="wrap mast"><a class="brand" href="#top"><svg aria-hidden="true" width="28" height="28" viewBox="0 0 28 28" fill="none"><path d="M2 21 11 6h6L8 21z" fill="#81A9FF"/><path d="m12 21 9-15h5l-9 15z" fill="#FFFFFF"/></svg>比值手记</a><nav aria-label="执行台导航"><a href="#top" aria-current="location">本周判断</a><a href="#plan">执行单</a><a href="#chart">比值走势</a><a href="#history">历史复盘</a></nav></div></header>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15211a" media="(prefers-color-scheme: dark)"><title>比值手记 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
+<header class="workspace-header">
+  <div class="mast">
+    <a class="brand" href="#top">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 15 4-4 4 2 7-6M4 20h16M8 11v9m4-7v7m7-13v13"/></svg></span>
+      <span>比值手记</span>
+    </a>
+    <nav aria-label="执行台导航">
+      <a href="#top" aria-current="location"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span>本周判断</span></a>
+      <a href="#plan"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="m8 9 1 1 2-2m2 2h3M8 15h8"/></svg><span>执行单</span></a>
+      <a href="#chart"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4v16h16M7 15l4-4 3 2 5-6"/></svg><span>比值走势</span></a>
+      <a href="#funds"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="2"/><path d="M4 10h16M8 15h3"/></svg><span>场外基金</span></a>
+      <a href="#history"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11a8 8 0 1 1 2 6M4 5v6h6m2-3v4l3 2"/></svg><span>历史复盘</span></a>
+    </nav>
+    <div class="sidebar-links"><a href="#rules">交易规则</a><a href="#data">行情与补录</a></div>
+  </div>
+  <div class="workspace-bar"><div class="workspace-bar-inner"><a href="#top">我的投资工作台</a><span aria-hidden="true">/</span><strong id="active-section">本周判断</strong></div></div>
+</header>
 <main id="top" class="wrap"><div class="intro"><div><p class="ey"><span>中证红利 <code>000922</code></span> <i>/</i> <span>创业板指 <code>399006</code></span></p><h1>五笔轮动执行台</h1></div><div class="data-dates">
   <a href="#data"><span>行情日收盘</span><strong id="daily-asof"></strong></a>
   <a href="#data"><span>策略周线截止</span><strong id="asof"></strong></a>
 </div></div>
-<section class="hero"><div class="call"><div class="label" id="signalLabel"></div><h2 id="headline"></h2><p id="reason"></p><a class="cta" href="#plan">查看我的执行单</a></div><div class="quote"><span>本周指数比值</span><strong id="ratio"></strong><div class="track"><span aria-hidden="true"></span><b id="pointer"></b></div><div class="limits"><span id="lo"></span><span id="hi"></span></div><p id="average"></p></div></section>
+<section class="hero" aria-label="本周判断与比值">
+  <div class="call">
+    <div class="label" id="signalLabel"></div>
+    <h2 id="headline"></h2>
+    <p id="reason"></p>
+    <a class="cta" href="#plan">查看我的执行单</a>
+  </div>
+  <div class="quote">
+    <div class="quote-number"><span>本周指数比值</span><strong id="ratio"></strong></div>
+    <div class="quote-mini"><svg id="quote-sparkline" viewBox="0 0 168 48" role="img" aria-label="近 26 周比值走势"></svg><span>近 26 周</span></div>
+    <div class="quote-context">
+      <div class="track"><span aria-hidden="true"></span><b id="pointer"></b></div>
+      <div class="limits"><span id="lo"></span><span id="hi"></span></div>
+      <p id="average"></p>
+    </div>
+  </div>
+</section>
 <section class="sheet" id="plan"><div class="heading"><div><p class="ey">按自己的起点执行</p><h2>我的五笔执行单</h2></div><span class="meta plan-storage">设置仅存此浏览器</span></div>
 <div class="form plan-form"><label>执行依据<select id="basis"><option value="model">按起点模拟</option><option value="actual">按实际持仓核对</option></select></label><fieldset class="start-picker">
  <legend>开始观察</legend>

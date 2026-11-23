@@ -10,12 +10,21 @@ extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
 function refresh(){
  rows=[...weeklyData,...extra];bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
  const m=bars[end];$('asof').textContent=rows[end][0];$('ratio').textContent=f(m.r);$('lo').textContent='红利线 '+f(m.low);$('hi').textContent='创业板线 '+f(m.high);
+ drawQuoteSparkline(bars.slice(-26).map(bar=>bar.r));
  const span=m.high-m.low;$('pointer').style.left=Math.max(0,Math.min(99,20+60*(m.r-m.low)/span))+'%';
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
  const selected=$('start').value||get('start',rows[end][0]);
  refreshStartPicker(selected);
  save('start',$('start').value);
  $('undo').disabled=!extra.length;refreshTrendCharts();plan();history();showDailyClose();
+}
+function drawQuoteSparkline(values) {
+ const min=Math.min(...values), max=Math.max(...values), span=max-min;
+ const points=values.map((value,i)=>[5+158*i/(values.length-1), span?5+36*(max-value)/span:24]);
+ const line=points.map(([x,y],i)=>(i?'L':'M')+x+' '+y).join(' ');
+ const [x,y]=points.at(-1);
+ $('quote-sparkline').innerHTML='<path class="spark-fill" d="'+line+'L163 47H5Z"/>'+
+  '<path class="spark-line" d="'+line+'"/><circle class="spark-tip" cx="'+x+'" cy="'+y+'" r="3.5"/>';
 }
 function refreshStartPicker(preferred) {
  const dates=rows.slice(START).map(row=>row[0]);
@@ -172,23 +181,25 @@ setInterval(refreshDailyClose, 10 * 60 * 1000);
 
 const navLinks=[...document.querySelectorAll('nav a')];
 function selectNav(hash){
+ const active=navLinks.find(link=>link.hash===hash);
+ $('active-section').textContent=active?.textContent.trim()||(hash==='#rules'?'交易规则':hash==='#data'?'行情与补录':'策略研究');
  for(const link of navLinks){
-  if(link.hash===hash)link.setAttribute('aria-current','location');
+  if(link===active)link.setAttribute('aria-current','location');
   else link.removeAttribute('aria-current');
  }
 }
 function visibleSection(){
  if(window.scrollY<12){selectNav('#top');return;}
- const hash=location.hash;
- const ids=['plan','chart','history'];
- const visible=ids.filter(id=>{const r=$(id).getBoundingClientRect();return r.top<innerHeight*.40 && r.bottom>92;});
- selectNav(visible.includes(hash.slice(1))?hash:visible.length?'#'+visible.at(-1):$('chart').getBoundingClientRect().top>0?'#top':'');
+ const ids=['plan','chart','funds','history','rules','data'];
+ const anchorY=innerHeight*.34;
+ const current=ids.findLast(id=>$(id).getBoundingClientRect().top<=anchorY);
+ selectNav(current?'#'+current:'#top');
 }
 addEventListener('scroll',visibleSection,{passive:true});
 addEventListener('hashchange',()=>selectNav(location.hash));
 visibleSection();
 
-for (const link of document.querySelectorAll('.data-dates a')) {
+for (const link of document.querySelectorAll('a[href="#data"]')) {
  link.addEventListener('click', () => { $('data').open = true; });
 }
 

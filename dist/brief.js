@@ -110,15 +110,41 @@ function mode(){
 function changeClass(value){return value>0?'up':value<0?'down':'';}
 function history(){
  const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
- $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大周线回撤</span><strong class="'+changeClass(model.draw)+'">'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
- renderHistoryDaily(model);
+ const dailyRisk=calculateDrawdowns(trendDaily.nav,trendDaily.dates);
+ $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大日度回撤</span><strong class="lot-risk">'+pct(dailyRisk.depth)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div><p class="meta">日度回撤截至 '+trendDaily.dates.at(-1)+' · '+drawdownDates(dailyRisk)+'。</p>';
+
  const roundSales=model.rounds.filter(r=>r.sales.length).slice().reverse();
  const dateButton=i=>i===undefined?'待成交':'<button type="button" class="sale-date" data-week="'+i+'">'+rows[i][0]+'</button>';
  $('sales').innerHTML=roundSales.length?'<table><thead><tr><th>卖出旧仓</th><th>卖一半</th><th>卖清剩余</th></tr></thead><tbody>'+roundSales.map(r=>'<tr data-asset="'+r.asset+'"><td>'+ASSETS[r.asset]+'</td><td>'+dateButton(r.sales[0])+'</td><td>'+dateButton(r.sales[1])+'</td></tr>').join('')+'</tbody></table>':'尚无模拟卖出成交。';
- $('cycles').innerHTML=model.rounds.map((r,j)=>'<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+'<span class="'+changeClass(r.ret)+'">'+pct(r.ret)+'</span></summary><p>'+ (r.end===undefined?'持有中，截至 '+rows[end][0]+' 按收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、'))+'</p><div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔收益</th></tr>'+r.lots.map(l=>'<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(l.ret)+'">'+pct(l.ret)+'</td></tr>').join('')+'</table></div></details>').join('');
+ $('cycles').innerHTML=model.rounds.map((r,j)=>{
+  const lots=r.lots.map((l,slot)=>{
+   const {risk,useDaily}=lotHistory(r,l);
+   return '<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(l.ret)+'">'+pct(l.ret)+'</td>'+
+    '<td><button type="button" class="risk-button" data-risk-round="'+j+'" data-risk-lot="'+slot+
+    '" aria-expanded="false" aria-controls="history-lot-'+j+'">'+pct(risk.depth)+(useDaily?'':'（周线）')+'</button></td></tr>';
+  }).join('');
+  const status=r.end===undefined?'持有中，截至 '+rows[end][0]+' 按周收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、');
+  return '<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+
+   '<span class="'+changeClass(r.ret)+'">'+pct(r.ret)+'</span></summary><p>'+status+'</p>'+
+   '<div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔周线收益</th><th>该笔最大回撤</th></tr>'+lots+'</table></div><div id="history-lot-'+j+'" class="history-lot-detail" hidden></div></details>';
+ }).join('');
 
  installTableControls();
 }
+$('cycles').onclick=e=>{
+ const button=e.target.closest('button[data-risk-lot]');
+ if(!button)return;
+ const roundIndex=Number(button.dataset.riskRound), slot=Number(button.dataset.riskLot);
+ const panel=$('history-lot-'+roundIndex), round=model.rounds[roundIndex], lot=round.lots[slot];
+ const open=button.getAttribute('aria-expanded')!=='true';
+ for(const other of button.closest('details').querySelectorAll('.risk-button'))other.setAttribute('aria-expanded','false');
+ panel.hidden=!open;
+ if(!open)return;
+ button.setAttribute('aria-expanded','true');
+ renderLotChart(panel,round,lot);
+ panel.insertAdjacentHTML('afterbegin','<h4>第 '+(slot+1)+' 笔 · '+rows[lot.i][0]+'</h4>');
+ panel.scrollIntoView({block:'nearest'});
+};
 function filterSales(){
  const filter=$('asset-filter').value;
  for(const row of $('sales').querySelectorAll('tr[data-asset]'))row.hidden=filter!==''&&row.dataset.asset!==filter;
@@ -198,7 +224,7 @@ function selectNav(hash){
 }
 function visibleSection(){
  if(window.scrollY<12){selectNav('#top');return;}
- const ids=['plan','chart','funds','history','rules','data'];
+ const ids=['plan','chart','history','funds','rules','data'];
  const anchorY=innerHeight*.34;
  const current=ids.findLast(id=>$(id).getBoundingClientRect().top<=anchorY);
  selectNav(current?'#'+current:'#top');

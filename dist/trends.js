@@ -10,7 +10,7 @@ const chartViews = [
 ];
 
 let trendRange, markedWeek, dragSelection;
-let trendDaily, dailyWindow, markedDay = null, hoverDay = null;
+let trendDaily, planDaily, dailyWindow, markedDay = null, hoverDay = null;
 let activePreset = 0, activeCalendarYear = '', hoverWeek = null;
 
 function keepBetween(value, low, high) {
@@ -185,40 +185,83 @@ function trendAxisLabels(p) {
  return labels;
 }
 
+function setPlanPerformanceScope(data) {
+ planDaily=data;
+ const scope=$('performance-scope');
+ scope.options[1].disabled=!data;
+ if(!data&&scope.value==='plan')scope.value='full';
+ if(trendRange){
+  renderLinkedReturns();
+  updateLinkedReadout(markedDay??rows[markedWeek][0],rows[markedWeek][0]);
+ }
+}
+
 function renderLinkedReturns() {
  const plot = makePlot({plot:'linked-return-plot'});
  const start = rows[trendRange.first][0], endDate = rows[trendRange.last][0];
- const allDates = trendDaily.dates;
+ const usePlan = $('performance-scope').value==='plan' && planDaily;
+ const portfolio = usePlan?planDaily:trendDaily;
+ const {dates:allDates,nav:allNav} = portfolio;
  const first = allDates.findIndex(day=>day>=start), last = allDates.findLastIndex(day=>day<=endDate);
- const period = $('linked-return-period');
- const top = 12;
+ const period = $('linked-return-period'), worst=$('linked-worst-draw'), scrub=$('linked-day');
+ const context=$('linked-return-context');
+ context.textContent=(usePlan?'执行单模拟 · 从 '+rows[planDaily.start][0]+' 以 ¥'+planMoney.format(planDaily.capital)+' 起步':'完整策略 · 从 1 万元起步')+
+  '。收益以所选区间首个可估值日为基准，回撤从区间内高点计算。';
  dailyWindow = null;
  plot.el.setAttribute('viewBox', '0 0 '+plot.width+' '+plot.height);
  const labels = trendAxisLabels(plot);
  if (first===-1 || last<first) {
   plot.el.innerHTML = '<g font-size="12" fill="var(--muted)">'+labels+'</g>';
-  period.textContent = '日度数据截至 '+allDates.at(-1);
-  $('linked-return-readout').textContent = '所选时间段暂无日度收益数据。';
+  period.textContent = '—';
+  worst.textContent = '—';
+  $('linked-draw-dates').textContent = '当前账户没有覆盖所选区间的日度估值。';
+  $('linked-return-readout').textContent = '日度数据截至 '+allDates.at(-1);
+  scrub.disabled=true;
   return;
  }
  const dates = allDates.slice(first,last+1);
  const times = dates.map(date=>Date.parse(date));
- const nav = trendDaily.nav.slice(first,last+1);
+ const nav = allNav.slice(first,last+1);
  const gains = nav.map(value=>100*(value/nav[0]-1));
- const axis = yAxis([0,...gains]);
- const y = value => plot.base-(plot.base-top)*(value-axis.min)/(axis.max-axis.min);
+ const risk = calculateDrawdowns(nav,dates);
+ const draw = risk.draws.map(value=>100*value);
  const x = i => plot.xTime(times[i]);
- const data = gains.map((value,i)=>(i?'L':'M')+x(i).toFixed(2)+' '+y(value).toFixed(2)).join(' ');
- const levels = [...new Set([...axis.ticks,0])].map(value =>
-  `<path d="M${plot.left} ${y(value)}H${plot.right}" stroke="${value===0?'var(--subtle)':'var(--grid)'}"/>
-  <text x="${plot.left-7}" y="${y(value)+4}" text-anchor="end">${Number(value.toFixed(2))}%</text>`
- ).join('');
- plot.el.innerHTML = `<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">${levels}${labels}</g>
-  <path d="${data}" fill="none" stroke="var(--account-ink)" stroke-width="1.9"/>
-  <g class="linked-return-marker" pointer-events="none"><line y1="${top}" y2="${plot.base}" stroke="var(--subtle)" stroke-dasharray="3 3"/>
-   <circle r="4" fill="var(--account-ink)" stroke="var(--surface)" stroke-width="1"/></g>`;
- dailyWindow = {plot,first,last,dates,times,nav,gains,y,x};
- period.textContent = '区间累计 '+signedRate(gains.at(-1)/100)+(dates.at(-1)===endDate?'':' · 估值至 '+dates.at(-1));
+ const upperBottom = Math.floor(plot.base*.57), lowerTop=upperBottom+27;
+ const parts = [
+  {values:gains, top:15, bottom:upperBottom, color:'var(--account-ink)', limit:5},
+  {values:draw, top:lowerTop, bottom:plot.base, color:'var(--amber)', limit:3}
+ ];
+ let svg='';
+ const scales=parts.map(({values,top,bottom,color,limit})=>{
+  const axis=yAxis([0,...values]);
+  const y=value=>bottom-(bottom-top)*(value-axis.min)/(axis.max-axis.min);
+  const levels=[...new Set([...axis.ticks,0])].sort((a,b)=>a-b);
+  const sparse=levels.filter((v,i)=>v===0||i===0||i===levels.length-1||levels.length<=limit);
+  const grid=sparse.map(value=>{
+   const yy=y(value);
+   return `<path d="M${plot.left} ${yy}H${plot.right}" stroke="${value===0?'var(--subtle)':'var(--grid)'}"/>
+    <text x="${plot.left-7}" y="${yy+4}" text-anchor="end">${Number(value.toFixed(2))}%</text>`;
+  }).join('');
+  const data=values.map((value,i)=>(i?'L':'M')+x(i).toFixed(2)+' '+y(value).toFixed(2)).join(' ');
+  svg+=grid+`<path d="${data}" fill="none" stroke="${color}" stroke-width="1.8"/>`;
+  return y;
+ });
+ if(risk.depth<0){
+  const mark=dates.indexOf(risk.trough);
+  svg+=`<circle cx="${x(mark)}" cy="${scales[1](draw[mark])}" r="4" fill="var(--amber)" stroke="var(--surface)"><title>最大回撤 ${risk.trough} · ${pct(risk.depth)}</title></circle>`;
+ }
+ plot.el.innerHTML = `<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">${svg}${labels}</g>
+  <g class="linked-return-marker" pointer-events="none"><line y1="15" y2="${plot.base}" stroke="var(--subtle)" stroke-dasharray="3 3"/>
+   <circle r="4" fill="var(--account-ink)" stroke="var(--surface)" stroke-width="1"/>
+   <circle r="4" fill="var(--amber)" stroke="var(--surface)" stroke-width="1"/></g>`;
+ dailyWindow = {plot,first,dates,times,nav,gains,draw,scales,x,allNav};
+ period.textContent=signedRate(gains.at(-1)/100);
+ worst.textContent=pct(risk.depth);
+ const coverage = dates[0]===start&&dates.at(-1)===endDate?'':'实际估值 '+dates[0]+' 至 '+dates.at(-1)+'。';
+ $('linked-draw-dates').textContent=coverage+drawdownDates(risk)+'。';
+ scrub.min=0;
+ scrub.max=dates.length-1;
+ scrub.disabled=dates.length===1;
 }
 
 function signedRate(rate) {
@@ -227,26 +270,27 @@ function signedRate(rate) {
 
 function updateLinkedReadout(day,weekDay) {
  if (!dailyWindow) return;
- const {dates,nav,gains,x,y,first,plot} = dailyWindow;
+ const {dates,nav,gains,draw,scales,x,first,plot,allNav} = dailyWindow;
  const i = dates.indexOf(day), marker = plot.el.querySelector('.linked-return-marker');
  marker.toggleAttribute('hidden',i<0);
  const readout = $('linked-return-readout');
  if (i<0) { readout.textContent = day+' 暂无日度估值。'; return; }
  marker.setAttribute('transform','translate('+x(i)+' 0)');
- marker.querySelector('circle').setAttribute('cy',y(gains[i]));
- const prev = trendDaily.nav[first+i-1];
+ const dots=marker.querySelectorAll('circle');
+ dots[0].setAttribute('cy',scales[0](gains[i]));
+ dots[1].setAttribute('cy',scales[1](draw[i]));
+ $('linked-day').value=i;
+ const prev = allNav[first+i-1];
  const dayChange = prev===undefined?'':'<span>当日 <b>'+signedRate(nav[i]/prev-1)+'</b></span>';
  readout.innerHTML = '<time datetime="'+day+'">'+day+'</time>'+dayChange+
   '<span>区间累计 <b>'+signedRate(gains[i]/100)+'</b></span><span>账户 <b>¥'+planMoney.format(nav[i])+'</b></span>'+
+  '<span>回撤 <b>'+pct(draw[i]/100)+'</b></span>'+
   (weekDay===day?'':'<span>周线参考 '+weekDay+'</span>');
 }
 
 function bindLinkedReturns() {
  const plot = $('linked-return-plot');
- function chooseDay(e,commit) {
-  if (!dailyWindow) return;
-  const {plot:p,times,dates} = dailyWindow;
-  const time = timeAtPointer(p,e), day = dates[closestTimeIndex(times,time)];
+ function chooseDay(day,commit) {
   const {first,last} = trendRange;
   let week = last;
   while(week>first && rows[week][0]>day) week--;
@@ -257,13 +301,34 @@ function bindLinkedReturns() {
    updateTrendReadouts(week,day);
   }
  }
- plot.onpointermove = e=>{if(e.pointerType!=='touch')chooseDay(e,false);};
- plot.onpointerup = e=>chooseDay(e,true);
+ function pointDay(e) {
+  const {plot:p,times,dates} = dailyWindow;
+  return dates[closestTimeIndex(times,timeAtPointer(p,e))];
+ }
+ plot.onpointermove = e=>{if(dailyWindow&&e.pointerType!=='touch')chooseDay(pointDay(e),false);};
+ plot.onpointerup = e=>{if(dailyWindow)chooseDay(pointDay(e),true);};
  plot.onpointerleave = ()=>{
   hoverWeek = null;
   hoverDay = null;
   updateTrendReadouts(markedWeek,markedDay);
  };
+ $('linked-day').oninput = e=>{if(dailyWindow)chooseDay(dailyWindow.dates[Number(e.target.value)],true);};
+ $('performance-scope').onchange = ()=>{
+  renderLinkedReturns();
+  updateLinkedReadout(markedDay??rows[markedWeek][0],rows[markedWeek][0]);
+ };
+ document.addEventListener('click', e=>{
+  const link=e.target.closest('a[data-performance]');
+  if(!link)return;
+  const plan=link.dataset.performance==='plan'&&planDaily;
+  $('performance-scope').value=plan?'plan':'full';
+  if(plan)setTrendRange(planDaily.start,end);
+  else if(link.dataset.performance==='all')chooseRecent(0);
+  else {
+   renderLinkedReturns();
+   updateLinkedReadout(markedDay??rows[markedWeek][0],rows[markedWeek][0]);
+  }
+ });
 }
 
 function tradeMarkers(plot, y, first, last) {

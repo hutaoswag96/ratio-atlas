@@ -231,7 +231,7 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 .step.done { border-top-color: var(--brand); }
 #planBody { border-top-color: var(--grid); }
 .order-row { border-radius: 5px; margin-top: 4px; }
-.scrub,.account-cursor,.index-readout { border-radius: 8px; }
+.scrub,.index-readout { border-radius: 8px; }
 #data.sheet { padding-block: 12px; }
 
 @media (max-width: 1010px) {
@@ -319,21 +319,10 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 #plan-settings #position-fields { display: contents; }
 #plan-settings #position-fields[hidden] { display: none; }
 #plan-settings #actualFields .form { align-items: end; }
-.account-plot { display: block; width: 100%; height: clamp(184px,23vw,270px); margin-top: 5px; cursor: crosshair; touch-action: pan-y; }
-.account-cursor output { display: flex; flex-wrap: wrap; gap: 2px 11px; }
-.account-cursor output span { white-space: nowrap; }
-.account-cursor output b { color: var(--ink); font-weight: 600; }
-.performance-ranges { margin-top: 7px; }
-#history-daily { margin-bottom: 19px; }
-#history-daily .account-trend { margin-top: 12px; }
-.daily-curve-note { margin: 8px 0; }
 @media (max-width: 700px) {
   #plan-settings { padding-inline: 10px; }
   #plan-setup-summary { margin-left: 0; }
   #plan-settings #actualFields .form { grid-template-columns: repeat(2,minmax(0,1fr)); }
-  .account-plot { height: 205px; }
-  .account-cursor output time { flex-basis: 100%; }
-  .performance-ranges button { min-height: 40px; }
 }
 
 .return-key { color: var(--account-ink); }
@@ -344,3 +333,28 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   #linked-return-plot { height: 174px; }
   #linked-return-readout time { flex-basis: 100%; font-size: 12px; }
 }
+
+#linked-performance { scroll-margin-block-start: 8px; }
+.performance-scope { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--muted); }
+.linked-risk-stats { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-top: 9px; }
+.linked-risk-stats > div { padding: 9px 12px; background: var(--layer); border: 1px solid var(--grid); border-radius: 8px; }
+.linked-risk-stats span { display: block; font-size: 13px; color: var(--muted); }
+.linked-risk-stats strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+#linked-return-period { color: var(--account-ink); }
+#linked-worst-draw,.draw-key,.lot-risk,.lot-depth strong { color: var(--amber); }
+#linked-return-plot { height: clamp(300px,30vw,385px); }
+.daily-scrub #linked-return-readout { padding: 0; background: transparent; }
+.history-curve-link { margin: 6px 0 13px; color: var(--brand); }
+.history-curve-link a:hover { text-decoration: underline; }
+.plan-lot summary>.lot-summary-metrics { display: flex; align-items: baseline; flex-wrap: wrap; gap: 3px 10px; }
+.plan-lot summary>.lot-summary-metrics::before { content: none; }
+.plan-lot summary .lot-risk { font-size: 13px; }
+@media(max-width:700px) {
+  #linked-return-plot { height: 291px; }
+  #linked-return-readout { width: 100%; }
+  .lot-summary-metrics { width: 100%; }
+}
+
+.risk-button { border: 0; background: transparent; color: var(--amber); min-height: 36px; text-decoration: underline; text-underline-offset: 3px; }
+.risk-button[aria-expanded=true] { background: var(--selected); }
+.history-lot-detail { margin-top: 10px; padding: 12px; border: 1px solid var(--grid); border-radius: 9px; background: var(--layer); }

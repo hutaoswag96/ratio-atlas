@@ -3,10 +3,10 @@
 const planMoney = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const signedMoney = amount => (amount > 0 ? '+' : amount < 0 ? '−' : '') + '¥' + planMoney.format(Math.abs(amount));
 
-let accountChartObserver, historyChartObserver;
+const lotSeriesCache = new WeakMap();
 
 function clearPlanPerformance() {
- accountChartObserver?.disconnect();
+ setPlanPerformanceScope(null);
  $('plan-return').replaceChildren();
  $('plan-lots').replaceChildren();
 }
@@ -25,39 +25,69 @@ function renderPlanPerformance(simulation, start, capital) {
    <div class="primary-gain"><span>累计盈亏</span><strong class="${changeClass(gain)}">${signedMoney(gain)}</strong></div>
    <div><span>累计收益率</span><strong class="${changeClass(rate)}">${rate>0?'+':''}${pct(rate)}</strong></div>
    <div><span>账户总值</span><strong>¥${planMoney.format(value)}</strong></div>
-   <div><span>最大回撤</span><strong class="${changeClass(simulation.draw)}">${pct(simulation.draw)}</strong></div>
+   <div><span>最大周线回撤</span><strong class="${changeClass(simulation.draw)}">${pct(simulation.draw)}</strong></div>
   </div>
   <p class="meta">以 ${planMoney.format(capital)} 元起步。 ${note}</p>
-  ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}
-  ${performanceChartMarkup('account','策略累计收益走势',daily?.dates.at(-1))}`;
+  ${daily?'<a class="plan-history-link" href="#linked-performance" data-performance="plan">查看该起点的收益与回撤</a>':'<p class="meta">这个起点暂时没有日度估值。</p>'}
+  ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}`;
  const full = $('full-plan');
  if (full) full.onclick = () => {
   selectStartWeek(rows[START][0]);
   plan();
   $('plan-return').scrollIntoView({block:'start'});
  };
- accountChartObserver?.disconnect();
- accountChartObserver = renderAccountTrend('account',daily??{
-  nav:simulation.nav,dates:rows.slice(start,start+simulation.nav.length).map(row=>row[0])
- },capital,Boolean(daily));
+ setPlanPerformanceScope(daily?{...daily,start,capital}:null);
  renderPlanLots(simulation.rounds);
 }
 
-function lotHistory(round, lot) {
- const column = 3 + round.asset;
- const last = round.end ?? end;
- let remain = lot.qty, cash = 0, peak = lot.cost, nextSale = 0;
- return Array.from({length: last - lot.i + 1}, (_, offset) => {
-  const i = lot.i + offset, fill = lot.fills[nextSale];
-  if (fill?.i === i) {
-   remain -= fill.qty;
-   cash += fill.proceeds;
-   nextSale++;
-  }
-  const value = cash + remain * rows[i][column];
-  peak = Math.max(peak, value);
-  return { i, gain: (value-lot.cost)/lot.cost, draw: value/peak-1 };
+function weeklyValuationCutoff(day) {
+ const time = Date.parse(day);
+ const monday = time-(new Date(time).getUTCDay()+6)%7*DAY;
+ return monday+11*DAY;
+}
+
+function calculateDrawdowns(nav, dates, initial=nav[0]) {
+ let peak=initial, peakAt=0;
+ let depth=0, highAt=0, lowAt=0, highValue=initial;
+ const draws=nav.map((value,i)=>{
+  if(value>=peak){peak=value;peakAt=i;}
+  const drop=value/peak-1;
+  if(drop<depth){depth=drop;highAt=peakAt;lowAt=i;highValue=peak;}
+  return drop;
  });
+ const recovered=depth<0?nav.findIndex((value,i)=>i>lowAt&&value>=highValue):-1;
+ return {draws,depth,peak:dates[highAt],trough:dates[lowAt],recovery:dates[recovered]};
+}
+
+function lotHistory(round,lot) {
+ const cached=lotSeriesCache.get(lot);
+ if(cached)return cached;
+ const first=rows[lot.i][0], last=rows[round.end??end][0], column=3+round.asset;
+ const useDaily=dailyTotalReturns.at(-1)[0]>=last;
+ const weeklyCloses=new Map(rows.slice(lot.i,(round.end??end)+1).map(row=>[row[0],row[column]]));
+ const cutoff=weeklyValuationCutoff(last);
+ const observations=useDaily?dailyTotalReturns
+  .filter(([date])=>date>=first&&(round.end===undefined?Date.parse(date)<cutoff:date<=last))
+  .map(row=>[row[0],weeklyCloses.get(row[0])??row[1+round.asset]]):[...weeklyCloses];
+ const fills=new Map(lot.fills.map(fill=>[rows[fill.i][0],fill]));
+ let remain=lot.qty,cash=0;
+ const dates=observations.map(([date])=>date);
+ const nav=observations.map(([date,close])=>{
+  const fill=fills.get(date);
+  if(fill){remain-=fill.qty;cash+=fill.proceeds;}
+  return cash+remain*close;
+ });
+ const risk=calculateDrawdowns(nav,dates,lot.cost);
+ const points=nav.map((value,i)=>({date:dates[i],gain:value/lot.cost-1,draw:risk.draws[i]}));
+ const result={points,risk,useDaily,through:dates.at(-1)};
+ lotSeriesCache.set(lot,result);
+ return result;
+}
+
+function drawdownDates(risk) {
+ if(!risk.depth)return '区间内无回撤';
+ return '从 '+risk.peak+' 高点到 '+risk.trough+' 谷底'+
+  (risk.recovery?' · '+risk.recovery+' 收复前高':' · 区间结束时尚未收复前高');
 }
 
 function renderPlanLots(rounds) {
@@ -69,9 +99,11 @@ function renderPlanLots(rounds) {
   const lotsHTML = round.lots.map((lot, slot) => {
    const id = String(lot.i);
    const gain = lot.ret * lot.cost;
+   const {risk,useDaily}=lotHistory(round,lot);
    return `<details class="plan-lot" data-lot="${id}" ${open.has(id)?'open':''}>
     <summary><span>第 ${slot+1} 笔 <time>${rows[lot.i][0]}</time></span>
-    <strong class="${changeClass(gain)}">${signedMoney(gain)} <small>${gain>0?'+':''}${pct(lot.ret)}</small></strong></summary>
+    <span class="lot-summary-metrics"><strong class="${changeClass(gain)}">${signedMoney(gain)} <small>${gain>0?'+':''}${pct(lot.ret)}</small></strong>
+    <small class="lot-risk">${useDaily?'最大回撤':'最大周线回撤'} <b>${pct(risk.depth)}</b></small></span></summary>
     <div class="lot-detail"></div>
    </details>`;
   }).join('');
@@ -79,7 +111,7 @@ function renderPlanLots(rounds) {
  });
  const totalLots = rounds.reduce((sum,round)=>sum+round.lots.length,0);
  container.innerHTML = '<details class="plan-lot-list" '+(expanded?'open':'')+'><summary>逐笔收益与回撤 <span>'+
-  totalLots+' 笔</span></summary><p class="meta">展开任意一笔查看从买入到卖清或最新周线的走势。</p>'+
+  totalLots+' 笔</span></summary><p class="meta">每笔由买入后价值高点计算回撤，点开可查看曲线与峰谷日期。</p>'+
   roundsHTML.reverse().join('')+'</details>';
  const list = container.querySelector('.plan-lot-list');
  for (const round of rounds) for (const lot of round.lots) {
@@ -96,14 +128,14 @@ function renderPlanLots(rounds) {
 }
 
 function renderLotChart(panel, round, lot) {
- const data = lotHistory(round, lot);
+ const {points:data,risk,useDaily,through}=lotHistory(round,lot);
  const plots = [
   {key:'gain', label:'收益率', color:'var(--brand)'},
   {key:'draw', label:'回撤', color:'var(--amber)'}
  ];
  const width = Math.max(218, panel.clientWidth - 16), height = 184, left = 43, right = width-9;
- const duration = elapsed(rows[data.at(-1).i][0], rows[lot.i][0]);
- const x = point => duration ? left + (right-left)*elapsed(rows[point.i][0], rows[lot.i][0])/duration : (left+right)/2;
+ const duration = elapsed(through, data[0].date);
+ const x = point => duration ? left + (right-left)*elapsed(point.date, data[0].date)/duration : (left+right)/2;
  let svg = '';
  for (const [section, plot] of plots.entries()) {
   const top = 13 + 79 * section, bottom = top + 62;
@@ -123,11 +155,12 @@ function renderLotChart(panel, round, lot) {
  for (let j = 0; j < tickCount; j++) {
   const point = data[tickCount===1?0:Math.round(j*(data.length-1)/(tickCount-1))];
   const align = tickCount===1?'middle':j===0?'start':j===tickCount-1?'end':'middle';
-  svg += `<text x="${x(point)}" y="${height-3}" text-anchor="${align}">${rows[point.i][0]}</text>`;
+  svg += `<text x="${x(point)}" y="${height-3}" text-anchor="${align}">${point.date}</text>`;
  }
- const trough = Math.min(...data.map(point => point.draw));
+
  panel.innerHTML = `
-  <p class="meta">投入 ¥${planMoney.format(lot.cost)} · ${round.end===undefined?'估值至':'卖清于'} ${rows[data.at(-1).i][0]} · 最大回撤 ${pct(trough)}</p>
+  <p class="meta">投入 ¥${planMoney.format(lot.cost)} · ${round.end===undefined?'估值至':'卖清于'} ${through} · ${useDaily?'日度估值':'周线估值'}</p>
+  <p class="meta lot-depth">最大回撤 <strong>${pct(risk.depth)}</strong> · ${drawdownDates(risk)}</p>
   <div class="lot-legends"><span>━ 收益率</span><span>━ 回撤</span></div>
   <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="该笔买入后的收益率及回撤曲线">
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
@@ -138,11 +171,9 @@ function renderLotChart(panel, round, lot) {
 function strategyDailySeries(weeks, daily, simulation, start) {
  const last = start + simulation.positions.length - 1;
  const lastDate = weeks[last][0];
- const lastMoment = Date.parse(lastDate);
- const lastMonday = lastMoment - (new Date(lastMoment).getUTCDay()+6)%7*DAY;
  // Value the current incomplete week, but wait for the next weekly close before
  // replaying any queued trades or showing dates beyond that checkpoint.
- const unverifiedFriday = lastMonday + 11*DAY;
+ const unverifiedFriday = weeklyValuationCutoff(lastDate);
  const dates = [], nav = [];
  let week = start;
  for (const [date, red, growth] of daily) {
@@ -155,118 +186,4 @@ function strategyDailySeries(weeks, daily, simulation, start) {
   nav.push(date===weeks[week][0]?simulation.nav[week-start]:dayValue);
  }
  return dates.length ? {dates,nav} : null;
-}
-
-function performanceChartMarkup(id,title,dailyThrough) {
- const label = dailyThrough ? '日度估值至 '+dailyThrough : '指数模拟 · 周收盘估值';
- const controls = dailyThrough
-  ? '<div class="segments performance-ranges" aria-label="收益图显示范围"><button type="button" data-points="20">近20日</button><button type="button" data-points="244">近一年</button><button type="button" data-points="0" aria-pressed="true">全部</button></div>'
-  : '';
- return `<section class="account-trend" aria-labelledby="${id}-trend-heading">
-  <div class="account-trend-title"><h4 id="${id}-trend-heading">${title}</h4><span>${label}</span></div>
-  ${controls}<svg class="account-plot" id="${id}-plot" role="img" aria-label="模拟账户累计收益率"></svg>
-  <div class="account-cursor"><label for="${id}-week">${dailyThrough?'查看某个交易日':'查看某一周'}</label><input id="${id}-week" type="range">
-   <output id="${id}-readout" for="${id}-week"></output></div>
- </section>`;
-}
-
-function renderHistoryDaily(simulation) {
- const data = strategyDailySeries(rows,dailyTotalReturns,simulation,START);
- historyChartObserver?.disconnect();
- $('history-daily').innerHTML = performanceChartMarkup('history-curve','策略日度收益走势',data.dates.at(-1))+
-  '<p class="meta daily-curve-note">每个交易日按两只全收益指数的收盘点位估值。买卖按周线记录，日度曲线可比上方周线统计多显示本周的行情。</p>';
- historyChartObserver = renderAccountTrend('history-curve',data,10000,true);
-}
-
-function renderAccountTrend(id, {dates,nav}, capital, daily) {
- const plot = $(id+'-plot'), scrub = $(id+'-week'), readout = $(id+'-readout');
- const values = nav.map(value => value/capital-1);
- const times = dates.map(date => Date.parse(date));
- const drawdowns = [];
- let peak = capital;
- for (const value of nav) {
-  peak = Math.max(peak,value);
-  drawdowns.push(value/peak-1);
- }
- const last = nav.length-1;
- let selected = last, first = 0, geometry;
- const shortRate = rate => (rate>0?'+':'')+pct(rate);
- scrub.min = first;
- scrub.max = last;
- scrub.value = selected;
- scrub.disabled = last===0;
-
- function showPoint(i) {
-  selected = i;
-  scrub.value = i;
-  const dayChange = daily && i ? '<span>当日 <b>'+shortRate(nav[i]/nav[i-1]-1)+'</b></span>' : '';
-  readout.innerHTML = '<time datetime="'+dates[i]+'">'+dates[i]+'</time>'+dayChange+
-   '<span>累计 <b>'+shortRate(values[i])+'</b></span><span>账户 <b>¥'+planMoney.format(nav[i])+
-   '</b></span><span>回撤 <b>'+pct(drawdowns[i])+'</b></span>';
-  const marker = plot.querySelector('.account-marker');
-  marker.setAttribute('transform','translate('+geometry.x(i)+' 0)');
-  marker.querySelector('circle').setAttribute('cy',geometry.y(values[i]));
- }
-
- function draw() {
-  const width = plot.clientWidth, height = plot.clientHeight;
-  if (!width || !height) return;
-  const visible = values.slice(first), duration = times[last]-times[first];
-  const range = yAxis(visible);
-  const left = 54, right = width-14, top = 12, bottom = height-26;
-  const x = i => left+(right-left)*(duration?(times[i]-times[first])/duration:.5);
-  const y = v => bottom-(bottom-top)*(v-range.min)/(range.max-range.min);
-  geometry = {x,y,left,right};
-  const levels = range.min<=0 && range.max>=0 ? [...new Set([...range.ticks,0])] : range.ticks;
-  const lines = levels.map(level => `<path d="M${left} ${y(level)}H${right}" stroke="${level===0?'var(--subtle)':'var(--grid)'}"/>
-   <text x="${left-8}" y="${y(level)+4}" text-anchor="end">${Number((100*level).toFixed(1))}%</text>`).join('');
-  const tickCount = Math.min(visible.length,Math.max(2,Math.floor((right-left)/103)+1));
-  const ticks = Array.from({length:tickCount},(_,n)=>{
-   const i = tickCount===1?first:first+Math.round(n*(last-first)/(tickCount-1));
-   const align = tickCount===1?'middle':n===0?'start':n===tickCount-1?'end':'middle';
-   const label = duration>200*DAY?dates[i].slice(0,7):dates[i];
-   return {i,align,label};
-  }).filter(({i,align},n,ticks)=>{
-   if(align!=='middle')return true;
-   const gap=duration>200*DAY?70:100;
-   return x(i)-x(ticks[n-1].i)>=gap && x(last)-x(i)>=gap;
-  }).map(({i,align,label})=>`<text x="${x(i)}" y="${height-5}" text-anchor="${align}">${label}</text>`).join('');
-  const d = visible.map((v,j)=>(j?'L':'M')+x(first+j).toFixed(2)+' '+y(v).toFixed(2)).join(' ');
-  plot.setAttribute('viewBox','0 0 '+width+' '+height);
-  plot.innerHTML = `<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">${lines}${ticks}</g>
-   <path d="${d}" stroke="var(--account-ink)" stroke-width="2" fill="none"/>
-   <g class="account-marker" pointer-events="none">
-    <line y1="${top}" y2="${bottom}" stroke="var(--subtle)" stroke-dasharray="3 3"/>
-    <circle r="4" fill="var(--account-ink)" stroke="var(--surface)" stroke-width="1"/>
-   </g>`;
-  showPoint(selected);
- }
-
- function inspect(e) {
-  if (!geometry) return;
-  const box = plot.getBoundingClientRect(), duration = times[last]-times[first];
-  const fraction = keepBetween((e.clientX-box.left-geometry.left)/(geometry.right-geometry.left),0,1);
-  const time = times[first]+duration*fraction;
-  let i = times.findIndex(t=>t>=time);
-  if (i<0) i=last;
-  if (i>first && time-times[i-1]<times[i]-time) i--;
-  showPoint(i);
- }
-
- for (const button of plot.parentElement.querySelectorAll('[data-points]')) button.onclick=()=>{
-  const count = Number(button.dataset.points);
-  first = count?Math.max(0,nav.length-count):0;
-  scrub.min = first;
-  scrub.disabled = first===last;
-  selected = last;
-  for (const option of button.parentElement.children) option.setAttribute('aria-pressed', option===button);
-  draw();
- };
- scrub.oninput = () => showPoint(Number(scrub.value));
- plot.onpointermove = e => { if (e.pointerType!=='touch') inspect(e); };
- plot.onpointerup = inspect;
- draw();
- const observer = new ResizeObserver(draw);
- observer.observe(plot);
- return observer;
 }

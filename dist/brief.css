@@ -162,14 +162,6 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
 
 :root{--account-ink:#0c6e72}
 @media(prefers-color-scheme:dark){:root{--account-ink:#8fc8be}}
-.account-trend{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
-#account-plot{display:block;width:100%;height:clamp(184px,23vw,270px);margin-top:5px;cursor:crosshair;touch-action:pan-y}
-.account-cursor{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;background:var(--layer);padding:7px 10px;font-size:14px}
-.account-cursor input{min-width:70px;flex:1;accent-color:var(--account-ink)}
-.account-cursor output{font-variant-numeric:tabular-nums;color:var(--muted)}
-.account-trend-title{display:flex;justify-content:space-between;gap:4px 12px;flex-wrap:wrap;align-items:baseline}
-.account-trend-title span{font-size:13px;color:var(--muted)}
-
 /* Date groups share the same controls and layout on both screen sizes. */
 .plan-form{grid-template-columns:minmax(140px,1fr) minmax(0,3fr) minmax(140px,1fr)}
 .start-picker{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;min-width:0;margin:0;padding:0;border:0}
@@ -214,9 +206,8 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
   .steps{overflow:visible}.step{padding:6px 3px;text-align:center}
   .step-date-full{display:none}.step-date-short{display:inline;white-space:nowrap}
   #plan-lots:not(:empty){margin-top:14px;padding-top:6px}
-  .account-cursor,.scrub{padding:7px 8px}
-  .account-cursor input,.scrub input{min-height:27px}
-  .account-cursor output{width:100%;font-size:13px}
+  .scrub{padding:7px 8px}
+  .scrub input{min-height:27px}
   .heading .segments{width:100%}.heading .segments button{flex:1;min-height:44px}
   .timeline{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:7px}
   .timeline label{display:grid;gap:3px;font-size:13px}

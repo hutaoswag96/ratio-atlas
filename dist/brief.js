@@ -16,6 +16,14 @@ function refresh(){
  $('start').value=rows.some((r,i)=>i>=START&&r[0]===selected)?selected:rows[end][0];save('start',$('start').value);
  $('undo').disabled=!extra.length;draw();plan();history();
 }
+function exitPlan(side,stage){
+ const held=side===null?'空仓':ASSETS[side],other=side===null?'另一边':ASSETS[1-side];
+ const status=side===null?'空仓，无持仓可卖':stage===1?'已确认换边，准备减半':'持有'+held+'，等待换仓信号';
+ if(stage===2)return '<section class="exit-plan"><h4>卖出安排</h4><p><b>第一笔已卖出 · 剩余份额待清仓</b></p><p>下一共同交易周收盘卖清'+held+'剩余的全部份额，同时用当时账户总额的 20% 买入'+other+'。这一步沿用已确认的换仓信号。</p></section>';
+ const trigger=side===null?'持仓后，等另一边进入观察区并确认转强。':(side===0?'创业板进入高位观察区，观察期内比值低于 13 周均值。':'红利进入低位观察区，观察期内比值高于 13 周均值。');
+ return '<section class="exit-plan"><h4>卖出安排</h4><p><b>'+status+'</b></p><p class="meta">触发条件：'+trigger+'</p><ol><li>确认后的下一周收盘，卖掉旧仓份额的 <b>50%</b>。</li><li>再下一周收盘，卖掉<b>全部剩余份额</b>，同时用当时账户总额的 20% 买入'+other+'。</li></ol></section>';
+}
+function saleName(t){return t.part===1?'卖清':'卖一半';}
 function plan(){
  const start=rows.findIndex(r=>r[0]===$('start').value),capital=Number($('capital').value),body=$('planBody');
  if(!(capital>=1&&capital<=1e11)){body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
@@ -28,6 +36,7 @@ function plan(){
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'数据已超过一个交易周。请在页末补录后再参考执行单。':why;
  let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':'待买')+'</b><small>'+(lot?rows[lot.i][0]:'20%')+'</small></div>';}
  body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
+ body.insertAdjacentHTML('beforeend',exitPlan(p.side,action?.kind==='sell'?(action.part===1?2:1):0));
  save('capital',capital);save('start',$('start').value);
 }
 function actualPlan(start,capital){
@@ -50,6 +59,7 @@ function actualPlan(start,capital){
  $('signalLabel').textContent='实际持仓核对 · '+(asset===null?'现金':ASSETS[asset]);
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'当前记录已超过一个交易周，请先补录最新收盘数据。':note;
  $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps">'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':'待买')+'</b><small>20%</small></div>').join('')+'</div>';
+ $('planBody').insertAdjacentHTML('beforeend',exitPlan(asset,half?2:asset!==null&&confirmed&&watch!==asset?1:0));
  save('actual',{raw,filled,last,half,capital,day});save('start',$('start').value);
 }
 function mode(){
@@ -62,10 +72,13 @@ function mode(){
 function history(){
  const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
  $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong>'+pct(ann)+'</strong></div><div><span>最大回撤</span><strong>'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
+ const roundSales=model.rounds.filter(r=>r.sales.length).slice().reverse();
+ const dateButton=i=>i===undefined?'待成交':'<button type="button" class="sale-date" data-week="'+i+'">'+rows[i][0]+'</button>';
+ $('sales').innerHTML=roundSales.length?'<table><thead><tr><th>卖出旧仓</th><th>卖一半</th><th>卖清剩余</th></tr></thead><tbody>'+roundSales.map(r=>'<tr><td>'+ASSETS[r.asset]+'</td><td>'+dateButton(r.sales[0])+'</td><td>'+dateButton(r.sales[1])+'</td></tr>').join('')+'</tbody></table>':'尚无模拟卖出成交。';
  $('cycles').innerHTML=model.rounds.map((r,j)=>'<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+'<span>'+pct(r.ret)+'</span></summary><p>'+ (r.end===undefined?'持有中，截至 '+rows[end][0]+' 按收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、'))+'</p><div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔收益</th></tr>'+r.lots.map(l=>'<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td>'+pct(l.ret)+'</td></tr>').join('')+'</table></div></details>').join('');
 }
 function draw(reset=true){
- const el=$('plot'),width=Math.max(275,el.clientWidth),height=el.clientHeight,left=35,right=11,top=15,bottom=26;
+ const el=$('plot'),width=Math.max(275,el.clientWidth),height=el.clientHeight,left=35,right=11,top=34,bottom=26;
  const first=range?Math.max(START,end-range+1):START,visible=bars.slice(first),vals=visible.flatMap(m=>[m.r,m.low,m.high]);
  const min=Math.floor((Math.min(...vals)-.08)*4)/4,max=Math.ceil((Math.max(...vals)+.08)*4)/4;
  const x=i=>left+(width-left-right)*(i-first)/(end-first),y=v=>top+(height-top-bottom)*(max-v)/(max-min);
@@ -74,13 +87,29 @@ function draw(reset=true){
  let out='';for(let v=min;v<=max+.0001;v+=max-min<=1?.25:.5){out+='<path d="M'+left+' '+y(v)+'H'+(width-right)+'" stroke="#dce3dc"/><text x="0" y="'+(y(v)+4)+'">'+v.toFixed(2)+'</text>';}
  for(const [k,col] of [['low','#b45f57'],['high','#507da7'],['r','#214d43']])out+='<path d="'+path(k,k!=='r')+'" fill="none" stroke="'+col+'" stroke-width="'+(k==='r'?1.8:1.1)+'" '+(k==='r'?'':'stroke-dasharray="4 3"')+'/>';
  for(const r of model.rounds)for(const lot of r.lots){if(lot.i>=first)out+='<circle cx="'+x(lot.i)+'" cy="'+y(bars[lot.i].r)+'" r="3.7" fill="'+(r.asset?'#24669f':'#b4493c')+'" stroke="white" stroke-width="1"/>';}
+ for(const t of model.trades){
+  if(t.kind!=='sell'||t.i<first)continue;
+  const cx=x(t.i),cy=y(bars[t.i].r),full=t.part===1;
+  // Separate adjacent sales vertically; leave the same-week purchase dot visible.
+  const tip=cy-(full?23:7);
+  out+='<g data-sale="'+t.i+'"><title>'+rows[t.i][0]+' '+ASSETS[t.asset]+' '+saleName(t)+'</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="#805321"/><path d="M'+(cx-4.8)+' '+(tip-8)+'h9.6l-4.8 8Z" stroke="#805321" stroke-width="1.5" fill="'+(full?'#805321':'white')+'"/></g>';
+ }
  for(let n=0;n<4;n++){const j=Math.round(first+(end-first)*n/3);out+='<text x="'+x(j)+'" y="'+(height-4)+'" text-anchor="'+(n===0?'start':n===3?'end':'middle')+'">'+rows[j][0].slice(0,7)+'</text>';}
  out+='<path stroke="#779389" stroke-dasharray="2 3" d="M'+x(i)+' '+top+'V'+(height-bottom)+'"/><circle cx="'+x(i)+'" cy="'+y(bars[i].r)+'" r="4" fill="#214d43"/>';
  el.setAttribute('viewBox','0 0 '+width+' '+height);el.innerHTML='<g font-family="sans-serif" font-size="11" fill="#516961">'+out+'</g>';
  $('readout').textContent=rows[i][0]+'　比值 '+f(bars[i].r)+'　下线 '+f(bars[i].low)+' / 上线 '+f(bars[i].high);
+ const acts=model.trades.filter(t=>t.i===i).map(t=>(t.kind==='buy'?'买入':saleName(t))+ASSETS[t.asset]);
+ if(acts.length)$('readout').textContent+='　模拟成交：'+acts.join('，');
 }
 $('ranges').onclick=e=>{if(!e.target.matches('button'))return;range=+e.target.dataset.n;for(const b of $('ranges').children)b.setAttribute('aria-pressed',b===e.target);draw();};
-$('cursor').oninput=()=>draw(false);$('plot').onpointerdown=e=>{const rect=$('plot').getBoundingClientRect(),a=+$('cursor').min;$('cursor').value=Math.round(a+(end-a)*Math.min(1,Math.max(0,(e.clientX-rect.left-35)/(rect.width-46))));draw(false);};
+$('cursor').oninput=()=>draw(false);$('plot').onpointerdown=e=>{const rect=$('plot').getBoundingClientRect(),a=+$('cursor').min;$('cursor').value=e.target.closest('[data-sale]')?.dataset.sale??Math.round(a+(end-a)*Math.min(1,Math.max(0,(e.clientX-rect.left-35)/(rect.width-46))));draw(false);};
+$('sales').onclick=e=>{
+ const button=e.target.closest('button[data-week]');if(!button)return;
+ const i=+button.dataset.week;
+ if(i<+$('cursor').min)$('ranges').querySelector('[data-n="0"]').click();
+ $('cursor').value=i;draw(false);$('chart').scrollIntoView({block:'start'});
+ $('cursor').focus({preventScroll:true});
+};
 $('start').onchange=plan;$('capital').value=get('capital',10000);$('capital').oninput=plan;
 new ResizeObserver(()=>{if(bars)draw(false)}).observe($('plot'));
 function monday(s){const n=new Date(s+'T00:00:00Z');return +n-(n.getUTCDay()+6)%7*DAY;}

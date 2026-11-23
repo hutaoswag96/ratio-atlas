@@ -10,6 +10,7 @@ const chartViews = [
 ];
 
 let trendRange, markedWeek, dragSelection;
+let trendDaily, dailyWindow, markedDay = null, hoverDay = null;
 let activePreset = 0, activeCalendarYear = '', hoverWeek = null;
 
 function keepBetween(value, low, high) {
@@ -19,6 +20,8 @@ function keepBetween(value, low, high) {
 function setTrendRange(first, last, options = {}) {
  trendRange = { first, last };
  markedWeek = keepBetween(options.mark ?? last, first, last);
+ markedDay = null;
+ hoverDay = null;
  activePreset = options.preset ?? null;
  activeCalendarYear = options.year ?? '';
  hoverWeek = null;
@@ -60,6 +63,7 @@ function syncTrendControls() {
 }
 
 function refreshTrendCharts() {
+ trendDaily = strategyDailySeries(rows,dailyTotalReturns,model,START);
  const years = [...new Set(rows.slice(START).map(row => row[0].slice(0, 4)))].reverse();
  $('chart-year').replaceChildren(new Option('选择年份', ''), ...years.map(year => new Option(year + ' 年', year)));
  for (const input of [$('chart-from'), $('chart-to')]) {
@@ -108,9 +112,9 @@ function makePlot(view) {
  const right = width - plotInset.right, base = height - plotInset.bottom;
  const times = rows.slice(first, last + 1).map(row => Date.parse(row[0]));
  const duration = times.at(-1) - times[0];
- const x = i => left + (right - left) *
-  (duration ? (times[i-first] - times[0]) / duration : .5);
- return { el, width, height, left, right, base, x, times, duration };
+ const xTime = time => left + (right-left)*(duration?(time-times[0])/duration:.5);
+ const x = i => xTime(times[i-first]);
+ return { el, width, height, left, right, base, x, xTime, times, duration };
 }
 
 function normalizedPoint(week, column) {
@@ -158,19 +162,108 @@ function renderTrendCharts() {
     (line.dashed?' stroke-dasharray="5 3"':'')+'/>';
   }
   if (!view.index) svg += tradeMarkers(p, y, first, last);
-  const tickCount = Math.min(indices.length, Math.max(2, Math.floor((p.right-p.left)/88)+1));
-  for (let n = 0; n < tickCount; n++) {
-   const j = tickCount === 1 ? first : Math.round(first + (last-first)*n/(tickCount-1));
-   const anchor = tickCount === 1 ? 'middle' : n === 0 ? 'start' : n === tickCount-1 ? 'end' : 'middle';
-   const label = p.duration > 200 * DAY ? rows[j][0].slice(0, 7) : rows[j][0].slice(5);
-   svg += '<path d="M'+p.x(j)+' '+p.base+'v4" stroke="var(--subtle)"/><text x="'+p.x(j)+'" y="'+(p.height-5)+'" text-anchor="'+anchor+'">'+label+'</text>';
-  }
+  svg += trendAxisLabels(p);
   p.el.setAttribute('viewBox', '0 0 '+p.width+' '+p.height);
   p.el.innerHTML = '<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">'+svg+
    '</g><g class="week-marker" pointer-events="none"><line stroke="var(--subtle)" stroke-dasharray="3 3"/>'+
    (view.index?'<circle r="3.8"/><circle r="3.8"/>':'<rect class="ratio-diamond" x="-4" y="-4" width="8" height="8"/>')+'</g>';
  }
- updateTrendReadouts(hoverWeek ?? markedWeek);
+ renderLinkedReturns();
+ updateTrendReadouts(hoverWeek ?? markedWeek, hoverWeek === null ? markedDay : hoverDay);
+}
+
+function trendAxisLabels(p) {
+ const {first,last} = trendRange, count = last-first+1;
+ const tickCount = Math.min(count,Math.max(2,Math.floor((p.right-p.left)/88)+1));
+ let labels = '';
+ for (let n=0; n<tickCount; n++) {
+  const week = tickCount===1?first:Math.round(first+(last-first)*n/(tickCount-1));
+  const anchor = tickCount===1?'middle':n===0?'start':n===tickCount-1?'end':'middle';
+  const label = p.duration>200*DAY?rows[week][0].slice(0,7):rows[week][0].slice(5);
+  labels += `<path d="M${p.x(week)} ${p.base}v4" stroke="var(--subtle)"/><text x="${p.x(week)}" y="${p.height-5}" text-anchor="${anchor}">${label}</text>`;
+ }
+ return labels;
+}
+
+function renderLinkedReturns() {
+ const plot = makePlot({plot:'linked-return-plot'});
+ const start = rows[trendRange.first][0], endDate = rows[trendRange.last][0];
+ const allDates = trendDaily.dates;
+ const first = allDates.findIndex(day=>day>=start), last = allDates.findLastIndex(day=>day<=endDate);
+ const period = $('linked-return-period');
+ const top = 12;
+ dailyWindow = null;
+ plot.el.setAttribute('viewBox', '0 0 '+plot.width+' '+plot.height);
+ const labels = trendAxisLabels(plot);
+ if (first===-1 || last<first) {
+  plot.el.innerHTML = '<g font-size="12" fill="var(--muted)">'+labels+'</g>';
+  period.textContent = '日度数据截至 '+allDates.at(-1);
+  $('linked-return-readout').textContent = '所选时间段暂无日度收益数据。';
+  return;
+ }
+ const dates = allDates.slice(first,last+1);
+ const times = dates.map(date=>Date.parse(date));
+ const nav = trendDaily.nav.slice(first,last+1);
+ const gains = nav.map(value=>100*(value/nav[0]-1));
+ const axis = yAxis([0,...gains]);
+ const y = value => plot.base-(plot.base-top)*(value-axis.min)/(axis.max-axis.min);
+ const x = i => plot.xTime(times[i]);
+ const data = gains.map((value,i)=>(i?'L':'M')+x(i).toFixed(2)+' '+y(value).toFixed(2)).join(' ');
+ const levels = [...new Set([...axis.ticks,0])].map(value =>
+  `<path d="M${plot.left} ${y(value)}H${plot.right}" stroke="${value===0?'var(--subtle)':'var(--grid)'}"/>
+  <text x="${plot.left-7}" y="${y(value)+4}" text-anchor="end">${Number(value.toFixed(2))}%</text>`
+ ).join('');
+ plot.el.innerHTML = `<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">${levels}${labels}</g>
+  <path d="${data}" fill="none" stroke="var(--account-ink)" stroke-width="1.9"/>
+  <g class="linked-return-marker" pointer-events="none"><line y1="${top}" y2="${plot.base}" stroke="var(--subtle)" stroke-dasharray="3 3"/>
+   <circle r="4" fill="var(--account-ink)" stroke="var(--surface)" stroke-width="1"/></g>`;
+ dailyWindow = {plot,first,last,dates,times,nav,gains,y,x};
+ period.textContent = '区间累计 '+signedRate(gains.at(-1)/100)+(dates.at(-1)===endDate?'':' · 估值至 '+dates.at(-1));
+}
+
+function signedRate(rate) {
+ return (rate>0?'+':'')+pct(rate);
+}
+
+function updateLinkedReadout(day,weekDay) {
+ if (!dailyWindow) return;
+ const {dates,nav,gains,x,y,first,plot} = dailyWindow;
+ const i = dates.indexOf(day), marker = plot.el.querySelector('.linked-return-marker');
+ marker.toggleAttribute('hidden',i<0);
+ const readout = $('linked-return-readout');
+ if (i<0) { readout.textContent = day+' 暂无日度估值。'; return; }
+ marker.setAttribute('transform','translate('+x(i)+' 0)');
+ marker.querySelector('circle').setAttribute('cy',y(gains[i]));
+ const prev = trendDaily.nav[first+i-1];
+ const dayChange = prev===undefined?'':'<span>当日 <b>'+signedRate(nav[i]/prev-1)+'</b></span>';
+ readout.innerHTML = '<time datetime="'+day+'">'+day+'</time>'+dayChange+
+  '<span>区间累计 <b>'+signedRate(gains[i]/100)+'</b></span><span>账户 <b>¥'+planMoney.format(nav[i])+'</b></span>'+
+  (weekDay===day?'':'<span>周线参考 '+weekDay+'</span>');
+}
+
+function bindLinkedReturns() {
+ const plot = $('linked-return-plot');
+ function chooseDay(e,commit) {
+  if (!dailyWindow) return;
+  const {plot:p,times,dates} = dailyWindow;
+  const time = timeAtPointer(p,e), day = dates[closestTimeIndex(times,time)];
+  const {first,last} = trendRange;
+  let week = last;
+  while(week>first && rows[week][0]>day) week--;
+  if(commit) selectTrendWeek(week,day);
+  else {
+   hoverWeek = week;
+   hoverDay = day;
+   updateTrendReadouts(week,day);
+  }
+ }
+ plot.onpointermove = e=>{if(e.pointerType!=='touch')chooseDay(e,false);};
+ plot.onpointerup = e=>chooseDay(e,true);
+ plot.onpointerleave = ()=>{
+  hoverWeek = null;
+  hoverDay = null;
+  updateTrendReadouts(markedWeek,markedDay);
+ };
 }
 
 function tradeMarkers(plot, y, first, last) {
@@ -200,7 +293,7 @@ function formatIndexPoint(week, column) {
  return pointFormat.format(value)+' 点（'+(change>0?'+':'')+pct(change)+'）';
 }
 
-function updateTrendReadouts(week) {
+function updateTrendReadouts(week, dailyDay) {
  const bar = bars[week], trades = tradesAt(week);
  const day = rows[week][0];
  $('readout').innerHTML = '<time datetime="'+day+'">'+day+'</time>'+
@@ -230,25 +323,36 @@ function updateTrendReadouts(week) {
    dot.setAttribute('fill', colors[i]);
   });
  }
+ updateLinkedReadout(dailyDay??day,day);
 }
 
-function selectTrendWeek(week) {
+function selectTrendWeek(week, day=null) {
  markedWeek = week;
+ markedDay = day;
  hoverWeek = null;
+ hoverDay = null;
  $('cursor').value = week;
- updateTrendReadouts(week);
+ updateTrendReadouts(week,day);
 }
 
 function weekAtPointer(view, e) {
  const mark = e.target.closest?.('[data-week]');
  if (mark) return Number(mark.dataset.week);
- const p = view.geometry, x = e.clientX - p.el.getBoundingClientRect().left;
- const fraction = keepBetween((x-p.left)/(p.right-p.left), 0, 1);
- const date = p.times[0] + fraction * p.duration;
- let j = p.times.findIndex(time => time >= date);
- if (j < 0) j = p.times.length - 1;
- if (j && date - p.times[j-1] < p.times[j] - date) j--;
- return trendRange.first + j;
+ const p = view.geometry;
+ return trendRange.first + closestTimeIndex(p.times,timeAtPointer(p,e));
+}
+
+function timeAtPointer(plot,e) {
+ const x = e.clientX-plot.el.getBoundingClientRect().left;
+ const fraction = keepBetween((x-plot.left)/(plot.right-plot.left),0,1);
+ return plot.times[0]+fraction*plot.duration;
+}
+
+function closestTimeIndex(times,time) {
+ let i=times.findIndex(value=>value>=time);
+ if(i<0) i=times.length-1;
+ if(i && time-times[i-1]<times[i]-time) i--;
+ return i;
 }
 
 function showTrendTip(view, e, week) {
@@ -288,6 +392,7 @@ function bindTrendPlot(view) {
   if (e.pointerType === 'touch') return;
   const week = weekAtPointer(view, e);
   hoverWeek = week;
+  hoverDay = null;
   updateTrendReadouts(week);
   if (dragSelection?.pointer === e.pointerId) {
    tip.hidden = true;
@@ -308,7 +413,8 @@ function bindTrendPlot(view) {
  plot.onpointerleave = () => {
   tip.hidden = true;
   hoverWeek = null;
-  updateTrendReadouts(markedWeek);
+  hoverDay = null;
+  updateTrendReadouts(markedWeek,markedDay);
  };
 }
 
@@ -333,6 +439,8 @@ function setupTrendCharts() {
  $('pan-forward').onclick = () => moveTrendWindow(1);
  $('cursor').oninput = () => selectTrendWeek(Number($('cursor').value));
  const observer = new ResizeObserver(() => { if (trendRange) renderTrendCharts(); });
+ bindLinkedReturns();
+ observer.observe($('linked-return-plot'));
  for (const view of chartViews) {
   bindTrendPlot(view);
   observer.observe($(view.plot));

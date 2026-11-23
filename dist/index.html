@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15211a" media="(prefers-color-scheme: dark)"><title>比值手记 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>比值手记 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
 <header class="workspace-header">
   <div class="mast">
     <a class="brand" href="#top">
@@ -78,12 +78,18 @@
     <form id="chart-dates" aria-label="自选起止日期"><label>起始 <input type="date" id="chart-from" required></label><label>结束 <input type="date" id="chart-to" required></label><button>应用</button></form>
   </details>
 </div>
-<div class="range-meta"><p id="chart-range-status" class="chart-range-status" role="status"></p><span>在图上拖选一段可放大</span></div>
+<div class="range-meta"><p id="chart-range-status" class="chart-range-status" role="status"></p><span>在周线图上拖选一段可放大</span></div>
 <div class="legend"><span class="ratio-key">━ 比值</span><span class="ratio-key">◇ 所选周</span><span class="red">● 买红利</span><span class="blue">● 买创业板</span><span class="sell-key">▽ 卖一半</span><span class="sell-key">▼ 卖清</span><span>┄ 年度观察线</span></div><div class="plot-frame"><svg id="plot" role="img" aria-label="中证红利除以创业板的周线走势、年度观察线及模拟买卖点"></svg><div id="ratio-selection" class="chart-selection" hidden></div><output id="plot-tip" aria-hidden="true" hidden></output></div><div class="scrub"><label for="cursor">查看某一周</label><input type="range" id="cursor"><output id="readout"></output></div><ul id="trade-readout" hidden aria-label="所选周的模拟成交"></ul><section class="index-panel" aria-labelledby="index-heading">
   <div class="index-title"><h3 id="index-heading">两只指数走势</h3><p>同一时间窗口，首周收盘均设为 100</p></div>
   <div class="legend"><span class="red">━ 中证红利 000922</span><span class="blue">┄ 创业板指 399006</span></div>
   <div class="plot-frame"><svg id="index-plot" role="img" aria-label="中证红利与创业板指的周线走势，按当前区间首周点位归一至 100"></svg><div id="index-selection" class="chart-selection" hidden></div><output id="index-tip" aria-hidden="true" hidden></output></div>
   <p class="meta index-readout" id="index-readout"></p>
+</section>
+<section class="index-panel linked-returns" aria-labelledby="linked-returns-heading">
+  <div class="index-title"><h3 id="linked-returns-heading">策略日度收益</h3><p id="linked-return-period"></p></div>
+  <div class="legend"><span class="return-key">━ 区间累计收益率</span><span>以区间首日账户市值为基准</span></div>
+  <div class="plot-frame"><svg id="linked-return-plot" role="img" aria-label="与比值和指数走势图使用相同时间范围的策略日度累计收益率"></svg></div>
+  <p class="meta index-readout" id="linked-return-readout"></p>
 </section>
 <details><summary>为什么观察线会移动？</summary><p>每年年初，把 2011 年起到上年底的每周比值从小到大排列，取 20% 和 80% 两处作为观察线，全年固定。回测首年使用启动前 156 条周线。红蓝点是历史模拟账户的实际买入周，后四笔可以出现在区间外。图上方的倒三角标记卖出成交周，圆点标记买入。选中同周换仓时，下方会分行列出先卖后买的两笔成交。</p></details></section>
 <section class="sheet" id="funds">

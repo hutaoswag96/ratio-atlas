@@ -9,10 +9,10 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --card-tint: #1b2d22;
-    --spark-area: #294638;
-    --brand-solid: #a0d5b7;
-    --brand-on-solid: #12251a;
+    --card-tint: #21252a;
+    --spark-area: #2d373b;
+    --brand-solid: #a2cdba;
+    --brand-on-solid: #161a1d;
   }
 }
 
@@ -334,4 +334,13 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   .account-plot { height: 205px; }
   .account-cursor output time { flex-basis: 100%; }
   .performance-ranges button { min-height: 40px; }
+}
+
+.return-key { color: var(--account-ink); }
+#linked-return-plot { display: block; width: 100%; height: clamp(185px,17vw,250px); cursor: crosshair; touch-action: pan-y; }
+#linked-return-readout { display: flex; flex-wrap: wrap; gap: 3px 12px; align-items: baseline; }
+#linked-return-readout span { white-space: nowrap; }
+@media (max-width: 700px) {
+  #linked-return-plot { height: 174px; }
+  #linked-return-readout time { flex-basis: 100%; font-size: 12px; }
 }

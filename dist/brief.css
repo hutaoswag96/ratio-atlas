@@ -9,7 +9,7 @@
   --space:24px; --small-radius:8px;
 }
 @media(prefers-color-scheme:dark){
-  :root{color-scheme:dark;--paper:#101a16;--surface:#17241e;--layer:#1d2c24;--ink:#edf3ec;--muted:#b0c0b5;--subtle:#879b8f;--nav:#15211a;--brand:#9cd2b4;--brand-hover:#c2e8d0;--selected:#243c2e;--line:#37483d;--grid:#304237;--field:#64796b;--trace:#a6d5b9;--up:#ff9692;--down:#79d3a5;--amber:#e8b978;--low-line:#b2726c;--high-line:#84a7c7;--blue:#95bde2}
+  :root{color-scheme:dark;--paper:#121417;--surface:#191c20;--layer:#21252a;--ink:#eef0f3;--muted:#b4bac3;--subtle:#8e97a3;--nav:#15181c;--brand:#a2cdba;--brand-hover:#c2e5d3;--selected:#2c3438;--line:#363c44;--grid:#30353c;--field:#68727e;--trace:#d1d8df;--up:#ff9692;--down:#79d3a5;--amber:#e8b978;--low-line:#b2726c;--high-line:#84a7c7;--blue:#95bde2}
 }
 *{box-sizing:border-box}
 html{scroll-padding-top:76px}
@@ -161,7 +161,7 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
 @media(max-width:700px){.fund-code{display:grid;grid-template-columns:auto auto}}
 
 :root{--account-ink:#0c6e72}
-@media(prefers-color-scheme:dark){:root{--account-ink:#74d4cd}}
+@media(prefers-color-scheme:dark){:root{--account-ink:#8fc8be}}
 .account-trend{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
 #account-plot{display:block;width:100%;height:clamp(184px,23vw,270px);margin-top:5px;cursor:crosshair;touch-action:pan-y}
 .account-cursor{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;background:var(--layer);padding:7px 10px;font-size:14px}
@@ -176,7 +176,7 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
 .start-picker legend{padding:0;margin-bottom:3px;font-size:14px;color:var(--muted)}
 .start-picker label{min-width:0}
 .step-date-short{display:none}
-#plot,#index-plot{--chart-axis-width:49px}
+#chart{--chart-axis-width:49px}
 #chart-date-panel{margin:0}
 #chart-date-panel[open]>summary{display:none}
 .timeline #chart-controls{order:3}
@@ -230,7 +230,7 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
   .range-meta{padding-bottom:6px}
   .range-meta span{display:none}
   .legend{gap:4px 10px}
-  #plot,#index-plot{--chart-axis-width:34px}
+  #chart{--chart-axis-width:42px}
   #plot{height:216px}#index-plot{height:174px}
   #trade-readout li{grid-template-columns:minmax(55px,auto) 1fr}
   .index-title{gap:3px 12px}

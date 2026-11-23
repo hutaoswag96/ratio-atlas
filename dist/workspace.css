@@ -351,7 +351,6 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 .plan-lot summary .lot-risk { font-size: 13px; }
 @media(max-width:700px) {
   #linked-return-plot { height: 291px; }
-  #linked-return-readout { width: 100%; }
   .lot-summary-metrics { width: 100%; }
 }
 

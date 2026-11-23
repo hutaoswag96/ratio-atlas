@@ -24,10 +24,15 @@ function simulate(rows,bars,start,capital=10000){
    if(order.kind==='buy'){
     if(side===null){side=asset;budget=cash;count=0;rounds.push({asset,lots:[],sales:[],start:i});}
     const cost=Math.min(cash,budget/5),qty=cost/(1+FEE)/price;
-    cash-=cost;units+=qty;count++;lastBuy=i;rounds.at(-1).lots.push({i,cost,qty,remaining:qty,proceeds:0});
+    cash-=cost;units+=qty;count++;lastBuy=i;rounds.at(-1).lots.push({i,cost,qty,remaining:qty,proceeds:0,fills:[]});
    }else{
     const round=rounds.at(-1);
-    for(const lot of round.lots){const qty=lot.remaining*order.part;lot.remaining-=qty;lot.proceeds+=qty*price*(1-FEE);}
+    for(const lot of round.lots){
+     const qty=lot.remaining*order.part, proceeds=qty*price*(1-FEE);
+     lot.remaining-=qty;
+     lot.proceeds+=proceeds;
+     lot.fills.push({i,qty,proceeds});
+    }
     round.sales.push(i);cash+=units*order.part*price*(1-FEE);units*=1-order.part;
     if(order.part===1){side=null;round.end=i;count=0;}
    }

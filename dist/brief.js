@@ -14,7 +14,7 @@ function refresh(){
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
  const selected=$('start').value||get('start',rows[end][0]);$('start').replaceChildren(...rows.slice(START).map((r,j)=>new Option(r[0],r[0])).reverse());
  $('start').value=rows.some((r,i)=>i>=START&&r[0]===selected)?selected:rows[end][0];save('start',$('start').value);
- $('undo').disabled=!extra.length;refreshTrendCharts();plan();history();
+ $('undo').disabled=!extra.length;refreshTrendCharts();plan();history();showDailyClose();
 }
 function exitPlan(side,stage){
  const held=side===null?'空仓':ASSETS[side],other=side===null?'另一边':ASSETS[1-side];
@@ -26,8 +26,8 @@ function exitPlan(side,stage){
 function saleName(t){return t.part===1?'卖清':'卖一半';}
 function plan(){
  const start=rows.findIndex(r=>r[0]===$('start').value),capital=Number($('capital').value),body=$('planBody');
- if(!(capital>=1&&capital<=1e11)){body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').dataset.tone='warning';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
- if($('basis').value==='actual'){actualPlan(start,capital);return;}
+ if(!(capital>=1&&capital<=1e11)){clearPlanPerformance();body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').dataset.tone='warning';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
+ if($('basis').value==='actual'){clearPlanPerformance();actualPlan(start,capital);return;}
  const p=simulate(rows,bars,start,capital),q=p.orders,action=q[0],stale=elapsed(shanghai(),rows[end][0])>=8;
  const known=p.watch!==null&&end-p.touch<13,asset=p.side===null?'现金':ASSETS[p.side],round=p.rounds.at(-1);
  const title=action?.kind==='sell'?(q.length===2?'卖清并换边':'旧仓卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
@@ -38,6 +38,7 @@ function plan(){
  let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':'待买')+'</b><small>'+(lot?rows[lot.i][0]:'20%')+'</small></div>';}
  body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
  body.insertAdjacentHTML('beforeend',exitPlan(p.side,action?.kind==='sell'?(action.part===1?2:1):0));
+ renderPlanPerformance(p,start,capital);
  save('capital',capital);save('start',$('start').value);
 }
 function actualPlan(start,capital){
@@ -134,6 +135,9 @@ $('basis').value=get('basis','model');$('basis').onchange=mode;
 for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='0';plan();};
 if($('basis').value==='actual')$('capital').value=actual.capital||10000;
 setupTrendCharts();refresh();mode();
+refreshDailyClose();
+addEventListener('focus', refreshDailyClose);
+setInterval(refreshDailyClose, 10 * 60 * 1000);
 
 const navLinks=[...document.querySelectorAll('nav a')];
 function selectNav(hash){
@@ -152,3 +156,7 @@ function visibleSection(){
 addEventListener('scroll',visibleSection,{passive:true});
 addEventListener('hashchange',()=>selectNav(location.hash));
 visibleSection();
+
+for (const link of document.querySelectorAll('.data-dates a')) {
+ link.addEventListener('click', () => { $('data').open = true; });
+}

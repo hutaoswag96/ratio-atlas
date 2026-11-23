@@ -105,3 +105,33 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
   #chart-controls{margin-left:auto}
   #chart-controls button{min-width:34px}
 }
+
+.intro>.data-dates{display:grid;grid-template-columns:repeat(2,auto);gap:0 16px;text-align:right}
+.data-dates a{display:grid;gap:2px;font-size:13px;color:var(--muted);white-space:nowrap}
+.data-dates a:hover{color:var(--brand)}
+.data-dates strong{font:600 15px var(--num);color:var(--ink)}
+.daily-detail{font-variant-numeric:tabular-nums;color:var(--ink)}
+.plan-return-heading,.plan-lot summary{display:flex;align-items:center;justify-content:space-between;gap:4px 12px;flex-wrap:wrap}
+.plan-return-heading span,.plan-lot time{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.plan-stats{grid-template-columns:repeat(2,minmax(0,1fr));margin:8px 0}
+.plan-stats>div:nth-child(odd){border-left:0}
+.plan-stats>div:nth-child(n+3){border-top:1px solid var(--line)}
+.plan-stats strong{font-size:clamp(16px,2vw,23px);overflow-wrap:anywhere}
+.plan-stats .primary-gain{background:var(--selected)}
+#plan-lots:not(:empty){margin-top:20px;border-top:1px solid var(--line);padding-top:16px}
+.lot-round:not(:first-of-type){margin-top:15px}
+.lot-round h4{padding:7px 8px;background:var(--layer)}
+.plan-lot{border-bottom:1px solid var(--line)}
+.plan-lot summary{padding-inline:8px;position:relative;cursor:pointer}
+.plan-lot summary::-webkit-details-marker{display:none}
+.plan-lot summary>span::before{content:"›";display:inline-block;margin-right:6px;color:var(--muted)}
+.plan-lot[open] summary>span::before{transform:rotate(90deg)}
+.plan-lot time{margin-left:5px}
+.plan-lot strong{font-variant-numeric:tabular-nums}
+.plan-lot strong small{font-size:12px;font-weight:550}
+.lot-detail{padding:2px 8px 5px}
+.lot-legends{display:flex;gap:16px;font-size:13px;color:var(--brand)}
+.lot-legends span+span{color:var(--amber)}
+.lot-chart-scroll{overflow:auto}
+.lot-chart-scroll svg{display:block;width:100%;min-width:218px;max-height:200px}
+@media(max-width:720px){.intro>.data-dates{grid-template-columns:1fr;gap:6px;flex-shrink:0}.data-dates a{font-size:11px}.data-dates strong{font-size:13px}}

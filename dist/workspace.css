@@ -360,6 +360,16 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 
 .quote-weekly { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; align-items: baseline; margin-bottom: 7px; font-size: 12px; color: var(--muted); }
 .quote-weekly b { color: var(--ink); font-weight: 650; }
+.daily-observation {
+  grid-column: 1/-1;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  font-size: .875rem;
+}
+.daily-observation strong { color: var(--ink); }
+.daily-observation span { color: var(--muted); }
 .quote .quote-number p { margin: 1px 0 0; font-size: 12px; }
 .quote .quote-number p.up { color: var(--up); }
 .quote .quote-number p.down { color: var(--down); }

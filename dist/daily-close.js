@@ -1,6 +1,6 @@
 'use strict';
 
-let dailyPrices = recentPriceSnapshot, dailyError = false, dailyPending = false;
+let liveDailyPrices = [], dailyError = false, dailyPending = false;
 
 function mergeDailyCloses(existing, incoming) {
  const byDay = new Map();
@@ -9,7 +9,18 @@ function mergeDailyCloses(existing, incoming) {
   if (row.slice(1).length !== 2 || !row.slice(1).every(value=>Number.isFinite(value)&&value>0)) continue;
   byDay.set(row[0],row);
  }
- return [...byDay.values()].sort((a,b)=>a[0].localeCompare(b[0])).slice(-20);
+ return [...byDay.values()].sort((a,b)=>a[0].localeCompare(b[0]));
+}
+
+function dailyChartQuotes() {
+ const weeklyCloses = rows.slice(START).map(([date,red,growth])=>[date,red,growth]);
+ return mergeDailyCloses(mergeDailyCloses(dailyPriceSnapshot,liveDailyPrices),weeklyCloses);
+}
+
+function dailyZone(ratio, band) {
+ if (ratio<=band.low) return 0;
+ if (ratio>=band.high) return 1;
+ return null;
 }
 
 function drawQuoteSparkline(prices) {
@@ -24,26 +35,37 @@ function drawQuoteSparkline(prices) {
 }
 
 function showDailyClose() {
- const weekly = rows[end], latest = dailyPrices.at(-1), useDaily = latest[0]>=weekly[0];
- const [date,red,growth] = useDaily?latest:weekly;
+ const weekly = rows[end], latest = trendQuotes.at(-1);
+ const [date,red,growth] = latest;
  const ratio = red/growth, change = $('daily-ratio-change');
  $('daily-asof').textContent = date;
  $('ratio').textContent = f(ratio);
  change.className = '';
- if (useDaily && dailyPrices.length>1) {
-  const [,previousRed,previousGrowth] = dailyPrices.at(-2);
+ if (trendQuotes.length>1) {
+  const [,previousRed,previousGrowth] = trendQuotes.at(-2);
   const delta = ratio/(previousRed/previousGrowth)-1;
   change.textContent = '较前一交易日 '+signedRate(delta);
   change.className = changeClass(delta);
  } else change.textContent = '收盘于 '+date;
- drawQuoteSparkline(dailyPrices);
- if (!useDaily) $('quote-sparkline-period').textContent = '日线走势截至 '+latest[0];
+ drawQuoteSparkline(trendQuotes.slice(-20));
+ const side = dailyZone(ratio, trendBands.get(date.slice(0,4)));
+ const observation = $('daily-observation');
+ observation.querySelector('strong').textContent = side===null?'两线之间':ASSETS[side]+'观察区';
+ const touch = trendQuotes.findLast(([day,a,b]) =>
+  day>weekly[0] && dailyZone(a/b,trendBands.get(day.slice(0,4)))!==null);
+ const context = observation.querySelector('span');
+ if (touch) {
+  const [day,a,b] = touch;
+  const touchedSide = dailyZone(a/b,trendBands.get(day.slice(0,4)));
+  context.textContent = side===null?'周线后曾入区 · '+day+' '+ASSETS[touchedSide]+' · 已退回区间':
+   '最近触线 '+day+' · 等待周收盘确认';
+ } else context.textContent = '买卖按周收盘确认';
  $('daily-detail').textContent = date+' 收盘 · 中证红利 '+pointFormat.format(red)+' · 创业板指 '+pointFormat.format(growth)+
   ' · 比值 '+f(ratio)+(dailyError?'。行情源暂不可用，显示最近已获取的收盘。':'。');
 }
 
 async function dailySeries(symbol, first, last) {
- const params = new URLSearchParams({ param: [symbol,'day',first,last,55,''].join(',') });
+ const params = new URLSearchParams({ param: [symbol,'day',first,last,325,''].join(',') });
  const response = await fetch('https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?'+params,
   { signal: AbortSignal.timeout(8000), credentials: 'omit', cache: 'no-store' });
  if (!response.ok) throw new Error('Daily close unavailable');
@@ -56,20 +78,25 @@ async function dailySeries(symbol, first, last) {
 
 async function refreshDailyClose() {
  if (dailyPending) return;
- const cached = get('daily-price-series', []);
- if (Array.isArray(cached)) dailyPrices = mergeDailyCloses(dailyPrices,cached);
- showDailyClose();
  dailyPending = true;
  try {
   const china = Date.now() + 8*3600000;
-  const cutoff = new Date(china - (new Date(china).getUTCHours() < 15 ? DAY : 0));
+  const cutoff = new Date(china - (new Date(china).getUTCHours() < 16 ? DAY : 0));
   const last = cutoff.toISOString().slice(0,10);
-  const first = new Date(+cutoff - 45*DAY).toISOString().slice(0,10);
-  const [red,growth] = await Promise.all([dailySeries('sh000922',first,last),dailySeries('sz399006',first,last)]);
-  const common = [...red.keys()].filter(day => growth.has(day)).map(day=>[day,red.get(day),growth.get(day)]);
+  const recent = new Date(+cutoff - 45*DAY).toISOString().slice(0,10);
+  const first = [liveDailyPrices.at(-1)?.[0]??dailyPriceSnapshot.at(-1)[0], recent].sort()[0];
+  const common = [];
+  for (let year=Number(first.slice(0,4)); year<=Number(last.slice(0,4)); year++) {
+   const from = first.startsWith(String(year))?first:year+'-01-01';
+   const to = last.startsWith(String(year))?last:year+'-12-31';
+   const [red,growth] = await Promise.all([dailySeries('sh000922',from,to),dailySeries('sz399006',from,to)]);
+   common.push(...[...red.keys()].filter(day => growth.has(day)).map(day=>[day,red.get(day),growth.get(day)]));
+  }
   if (!common.length) throw new Error('No shared dates');
-  dailyPrices = mergeDailyCloses(dailyPrices,common);
-  save('daily-price-series',dailyPrices);
+  const snapshotEnd = dailyPriceSnapshot.at(-1)[0];
+  liveDailyPrices = mergeDailyCloses(liveDailyPrices, common.filter(row=>row[0]>snapshotEnd));
+  save('daily-price-series',liveDailyPrices);
+  refreshTrendQuotes();
   dailyError = false;
  } catch {
   dailyError = true;

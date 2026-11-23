@@ -3,6 +3,8 @@ const $=id=>document.getElementById(id), f=n=>n.toFixed(3), fmt=n=>Math.round(n)
 function get(key,alt){try{return JSON.parse(localStorage.getItem('rotation1:'+key))??alt}catch{return alt}}
 function save(key,v){try{localStorage.setItem('rotation1:'+key,JSON.stringify(v));return true}catch{return false}}
 const shanghai=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
+const cachedDailyPrices=get('daily-price-series',[]);
+if(Array.isArray(cachedDailyPrices))liveDailyPrices=mergeDailyCloses([],cachedDailyPrices);
 let extra=get('rows',[]),rows,bars,model,end;
 function validRow(r){return Array.isArray(r)&&r.length===5&&/^\d{4}-\d\d-\d\d$/.test(r[0])&&r.slice(1).every(n=>Number.isFinite(n)&&n>0);}
 if(!Array.isArray(extra))extra=[];

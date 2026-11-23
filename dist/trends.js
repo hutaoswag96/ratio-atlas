@@ -9,9 +9,10 @@ const chartViews = [
  { plot: 'index-plot', tip: 'index-tip', selection: 'index-selection', top: 15, index: true }
 ];
 
-let trendRange, markedWeek, dragSelection;
-let trendDaily, planDaily, dailyWindow, markedDay = null, hoverDay = null;
-let activePreset = 0, activeCalendarYear = '', hoverWeek = null;
+let trendRange, markedDay, dragSelection;
+let trendQuotes, trendDates, trendBands, tradeWeeks;
+let trendDaily, planDaily, dailyWindow, hoverDay = null;
+let activePreset = 0, activeCalendarYear = '';
 
 function keepBetween(value, low, high) {
  return Math.max(low, Math.min(high, value));
@@ -19,89 +20,120 @@ function keepBetween(value, low, high) {
 
 function setTrendRange(first, last, options = {}) {
  trendRange = { first, last };
- markedWeek = keepBetween(options.mark ?? last, first, last);
- markedDay = null;
- hoverDay = null;
+ markedDay = keepBetween(options.mark ?? last, first, last);
  activePreset = options.preset ?? null;
  activeCalendarYear = options.year ?? '';
- hoverWeek = null;
+ hoverDay = null;
  for (const view of chartViews) $(view.tip).hidden = true;
  syncTrendControls();
  renderTrendCharts();
 }
 
-function chooseRecent(count) {
- const first = count ? Math.max(START, end - count + 1) : START;
- setTrendRange(first, end, { preset: count });
+function chooseRecent(months) {
+ const last = trendDates.length - 1;
+ if (!months) { setTrendRange(0, last, { preset: 0 }); return; }
+ const today = new Date(trendDates[last]);
+ const target = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth()-months, 1));
+ const monthEnd = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth()+1, 0));
+ target.setUTCDate(Math.min(today.getUTCDate(), monthEnd.getUTCDate()));
+ const first = trendDates.findIndex(day=>day>=target.toISOString().slice(0,10));
+ setTrendRange(first, last, { preset: months });
 }
 
 function chooseYear(year) {
- const first = rows.findIndex((row, i) => i >= START && row[0].startsWith(year));
- const last = rows.findLastIndex(row => row[0].startsWith(year));
- if (first >= START) setTrendRange(first, last, { year });
+ const first = trendDates.findIndex(day=>day.startsWith(year));
+ const last = trendDates.findLastIndex(day=>day.startsWith(year));
+ if (first !== -1) setTrendRange(first, last, { year });
 }
 
 function syncTrendControls() {
  const { first, last } = trendRange;
  const count = last - first + 1;
- $('chart-from').value = rows[first][0];
- $('chart-to').value = rows[last][0];
+ $('chart-from').value = trendDates[first];
+ $('chart-to').value = trendDates[last];
  $('chart-year').value = activeCalendarYear;
- $('chart-range-status').textContent = '显示 ' + rows[first][0] + ' 至 ' + rows[last][0] + ' · ' + count + ' 个交易周';
+ $('chart-range-status').textContent = '显示 ' + trendDates[first] + ' 至 ' + trendDates[last] + ' · ' + count + ' 个交易日';
  for (const button of $('ranges').querySelectorAll('button')) {
   button.setAttribute('aria-pressed', Number(button.dataset.n) === activePreset);
  }
- $('zoom-in').disabled = count <= 4;
- $('zoom-out').disabled = count === end - START + 1;
- $('pan-back').disabled = first === START;
- $('pan-forward').disabled = last === end;
+ $('zoom-in').disabled = count <= 2;
+ $('zoom-out').disabled = count === trendDates.length;
+ $('pan-back').disabled = first === 0;
+ $('pan-forward').disabled = last === trendDates.length - 1;
  const cursor = $('cursor');
  cursor.min = first;
  cursor.max = last;
  cursor.disabled = first === last;
- cursor.value = markedWeek;
+ cursor.value = markedDay;
 }
 
 function refreshTrendCharts() {
  trendDaily = strategyDailySeries(rows,dailyTotalReturns,model,START);
- const years = [...new Set(rows.slice(START).map(row => row[0].slice(0, 4)))].reverse();
+ tradeWeeks = new Map(model.trades.map(trade=>[rows[trade.i][0],trade.i]));
+ refreshTrendQuotes(true);
+}
+
+function refreshTrendQuotes(force=false) {
+ const quotes = dailyChartQuotes();
+ if (!force && quotes.length===trendQuotes.length && quotes.every((row,i)=>
+  row.every((v,j)=>v===trendQuotes[i][j]))) return;
+ const previousDates = trendDates;
+ const latestWasSelected = trendRange && markedDay===trendRange.last;
+ const from = trendRange && previousDates[trendRange.first];
+ const to = trendRange && previousDates[trendRange.last];
+ const marked = trendRange && previousDates[markedDay];
+ trendQuotes = quotes;
+ trendDates = quotes.map(row=>row[0]);
+ const years = [...new Set(trendDates.map(day=>day.slice(0,4)))].reverse();
+ trendBands = new Map();
+ for (let i=START;i<=end;i++) {
+  const year=rows[i][0].slice(0,4);
+  if (!trendBands.has(year)) trendBands.set(year,bars[i]);
+ }
+ for (const year of years) {
+  if (trendBands.has(year)) continue;
+  const history = rows.filter(row=>row[0]<year+'-01-01').map(row=>row[1]/row[2]).sort((a,b)=>a-b);
+  trendBands.set(year,{low:quantile(history,.2),high:quantile(history,.8)});
+ }
  $('chart-year').replaceChildren(new Option('选择年份', ''), ...years.map(year => new Option(year + ' 年', year)));
  for (const input of [$('chart-from'), $('chart-to')]) {
-  input.min = rows[START][0];
-  input.max = rows[end][0];
+  input.min = trendDates[0];
+  input.max = trendDates.at(-1);
  }
  if (activePreset !== null) chooseRecent(activePreset);
  else if (activeCalendarYear) chooseYear(activeCalendarYear);
  else {
-  const first = Math.min(trendRange.first, end), last = Math.min(trendRange.last, end);
-  setTrendRange(first, last, { mark: markedWeek });
+  const first = Math.max(0,trendDates.findIndex(day=>day>=from));
+  const last = Math.max(first,trendDates.findLastIndex(day=>day<=to));
+  setTrendRange(first,last,{mark:latestWasSelected?last:trendDates.indexOf(marked)});
  }
 }
 
 function moveTrendWindow(direction) {
  const { first, last } = trendRange;
  const distance = last - first;
- const next = keepBetween(first + direction * Math.max(1, Math.round((distance + 1) / 2)), START, end - distance);
- setTrendRange(next, next + distance, { mark: markedWeek + next - first });
+ const next = keepBetween(first + direction * Math.max(1, Math.round((distance + 1) / 2)), 0, trendDates.length - 1 - distance);
+ setTrendRange(next, next + distance, { mark: markedDay + next - first });
 }
 
 function zoomTrendWindow(inward) {
  const { first, last } = trendRange;
  const count = last - first + 1;
- const size = inward ? Math.max(4, Math.floor(count * .65)) : Math.min(end - START + 1, Math.ceil(count / .65));
- const anchor = hoverWeek ?? markedWeek;
+ const size = inward ? Math.max(2, Math.floor(count * .65)) : Math.min(trendDates.length, Math.ceil(count / .65));
+ const anchor = hoverDay ?? markedDay;
  const position = count > 1 ? (anchor - first) / (count - 1) : .5;
- const next = keepBetween(Math.round(anchor - (size - 1) * position), START, end - size + 1);
+ const next = keepBetween(Math.round(anchor - (size - 1) * position), 0, trendDates.length - size);
  setTrendRange(next, next + size - 1, { mark: anchor });
 }
 
 function showTradeWeek(week) {
+ const day = trendDates.indexOf(rows[week][0]);
  const { first, last } = trendRange;
- if (week < first || week > last) {
+ if (day < first || day > last) {
   const distance = last - first;
-  const start = keepBetween(week - Math.floor(distance / 2), START, end - distance);
-  setTrendRange(start, start + distance, { mark: week });
- } else selectTrendWeek(week);
+  const start = keepBetween(day - Math.floor(distance / 2), 0, trendDates.length - 1 - distance);
+  setTrendRange(start, start + distance, { mark: day });
+ } else selectTrendDay(day);
 }
 
 function makePlot(view) {
@@ -110,15 +142,23 @@ function makePlot(view) {
  const width = el.clientWidth, height = el.clientHeight;
  const left = parseFloat(getComputedStyle(el).getPropertyValue('--chart-axis-width'));
  const right = width - plotInset.right, base = height - plotInset.bottom;
- const times = rows.slice(first, last + 1).map(row => Date.parse(row[0]));
+ const times = trendDates.slice(first,last+1).map(Date.parse);
  const duration = times.at(-1) - times[0];
  const xTime = time => left + (right-left)*(duration?(time-times[0])/duration:.5);
  const x = i => xTime(times[i-first]);
  return { el, width, height, left, right, base, x, xTime, times, duration };
 }
 
-function normalizedPoint(week, column) {
- return 100 * rows[week][column] / rows[trendRange.first][column];
+function normalizedPoint(day, column) {
+ return 100 * trendQuotes[day][column] / trendQuotes[trendRange.first][column];
+}
+
+function ratioAt(day) {
+ return trendQuotes[day][1]/trendQuotes[day][2];
+}
+
+function bandAt(day) {
+ return trendBands.get(trendDates[day].slice(0,4));
 }
 
 function yAxis(values) {
@@ -143,9 +183,9 @@ function renderTrendCharts() {
    { values: indices.map(i => normalizedPoint(i, 1)), color: 'var(--up)' },
    { values: indices.map(i => normalizedPoint(i, 2)), color: 'var(--blue)', dashed: true }
   ] : [
-   { values: indices.map(i => bars[i].low), color: 'var(--low-line)', step: true, dashed: true },
-   { values: indices.map(i => bars[i].high), color: 'var(--high-line)', step: true, dashed: true },
-   { values: indices.map(i => bars[i].r), color: 'var(--ratio-ink)' }
+   { values: indices.map(i => bandAt(i).low), color: 'var(--low-line)', step: true, dashed: true },
+   { values: indices.map(i => bandAt(i).high), color: 'var(--high-line)', step: true, dashed: true },
+   { values: indices.map(i => ratioAt(i)), color: 'var(--ratio-ink)' }
   ];
   const axis = yAxis(series.flatMap(line => line.values));
   const y = value => p.base - (p.base - view.top) * (value - axis.min) / (axis.max - axis.min);
@@ -161,6 +201,11 @@ function renderTrendCharts() {
    svg += '<path d="'+d+'" stroke="'+line.color+'" fill="none" stroke-width="'+(line.step?1:1.7)+'"'+
     (line.dashed?' stroke-dasharray="5 3"':'')+'/>';
   }
+  if (indices.length===1) {
+   for (const line of series.filter(entry=>!entry.step)) {
+    svg += '<circle cx="'+p.x(first)+'" cy="'+y(line.values[0])+'" r="3" fill="'+line.color+'"/>';
+   }
+  }
   if (!view.index) svg += tradeMarkers(p, y, first, last);
   svg += trendAxisLabels(p);
   p.el.setAttribute('viewBox', '0 0 '+p.width+' '+p.height);
@@ -169,7 +214,7 @@ function renderTrendCharts() {
    (view.index?'<circle r="3.8"/><circle r="3.8"/>':'<rect class="ratio-diamond" x="-4" y="-4" width="8" height="8"/>')+'</g>';
  }
  renderLinkedReturns();
- updateTrendReadouts(hoverWeek ?? markedWeek, hoverWeek === null ? markedDay : hoverDay);
+ updateTrendReadouts(hoverDay ?? markedDay);
 }
 
 function trendAxisLabels(p) {
@@ -177,10 +222,10 @@ function trendAxisLabels(p) {
  const tickCount = Math.min(count,Math.max(2,Math.floor((p.right-p.left)/88)+1));
  let labels = '';
  for (let n=0; n<tickCount; n++) {
-  const week = tickCount===1?first:Math.round(first+(last-first)*n/(tickCount-1));
+  const day = tickCount===1?first:Math.round(first+(last-first)*n/(tickCount-1));
   const anchor = tickCount===1?'middle':n===0?'start':n===tickCount-1?'end':'middle';
-  const label = p.duration>200*DAY?rows[week][0].slice(0,7):rows[week][0].slice(5);
-  labels += `<path d="M${p.x(week)} ${p.base}v4" stroke="var(--subtle)"/><text x="${p.x(week)}" y="${p.height-5}" text-anchor="${anchor}">${label}</text>`;
+  const label = p.duration>200*DAY?trendDates[day].slice(0,7):trendDates[day].slice(5);
+  labels += `<path d="M${p.x(day)} ${p.base}v4" stroke="var(--subtle)"/><text x="${p.x(day)}" y="${p.height-5}" text-anchor="${anchor}">${label}</text>`;
  }
  return labels;
 }
@@ -192,13 +237,13 @@ function setPlanPerformanceScope(data) {
  if(!data&&scope.value==='plan')scope.value='full';
  if(trendRange){
   renderLinkedReturns();
-  updateLinkedReadout(markedDay??rows[markedWeek][0],rows[markedWeek][0]);
+  updateLinkedReadout(hoverDay ?? markedDay);
  }
 }
 
 function renderLinkedReturns() {
  const plot = makePlot({plot:'linked-return-plot'});
- const start = rows[trendRange.first][0], endDate = rows[trendRange.last][0];
+ const start = trendDates[trendRange.first], endDate = trendDates[trendRange.last];
  const usePlan = $('performance-scope').value==='plan' && planDaily;
  const portfolio = usePlan?planDaily:trendDaily;
  const {dates:allDates,nav:allNav} = portfolio;
@@ -268,7 +313,8 @@ function signedRate(rate) {
  return (rate>0?'+':'')+pct(rate);
 }
 
-function updateLinkedReadout(day,weekDay) {
+function updateLinkedReadout(index) {
+ const day = trendDates[index];
  if (!dailyWindow) return;
  const {dates,nav,gains,draw,scales,x,first,plot,allNav} = dailyWindow;
  const i = dates.indexOf(day), marker = plot.el.querySelector('.linked-return-marker');
@@ -284,21 +330,18 @@ function updateLinkedReadout(day,weekDay) {
  const dayChange = prev===undefined?'':'<span>当日 <b>'+signedRate(nav[i]/prev-1)+'</b></span>';
  readout.innerHTML = '<time datetime="'+day+'">'+day+'</time>'+dayChange+
   '<span>区间累计 <b>'+signedRate(gains[i]/100)+'</b></span><span>账户 <b>¥'+planMoney.format(nav[i])+'</b></span>'+
-  '<span>回撤 <b>'+pct(draw[i]/100)+'</b></span>'+
-  (weekDay===day?'':'<span>周线参考 '+weekDay+'</span>');
+  '<span>回撤 <b>'+pct(draw[i]/100)+'</b></span>';
 }
 
 function bindLinkedReturns() {
  const plot = $('linked-return-plot');
  function chooseDay(day,commit) {
-  const {first,last} = trendRange;
-  let week = last;
-  while(week>first && rows[week][0]>day) week--;
-  if(commit) selectTrendWeek(week,day);
+  const index = trendDates.indexOf(day);
+  if (index<0) return;
+  if (commit) selectTrendDay(index);
   else {
-   hoverWeek = week;
-   hoverDay = day;
-   updateTrendReadouts(week,day);
+   hoverDay = index;
+   updateTrendReadouts(index);
   }
  }
  function pointDay(e) {
@@ -308,25 +351,24 @@ function bindLinkedReturns() {
  plot.onpointermove = e=>{if(dailyWindow&&e.pointerType!=='touch')chooseDay(pointDay(e),false);};
  plot.onpointerup = e=>{if(dailyWindow)chooseDay(pointDay(e),true);};
  plot.onpointerleave = ()=>{
-  hoverWeek = null;
   hoverDay = null;
-  updateTrendReadouts(markedWeek,markedDay);
+  updateTrendReadouts(markedDay);
  };
  $('linked-day').oninput = e=>{if(dailyWindow)chooseDay(dailyWindow.dates[Number(e.target.value)],true);};
  $('performance-scope').onchange = ()=>{
   renderLinkedReturns();
-  updateLinkedReadout(markedDay??rows[markedWeek][0],rows[markedWeek][0]);
+  updateLinkedReadout(hoverDay ?? markedDay);
  };
  document.addEventListener('click', e=>{
   const link=e.target.closest('a[data-performance]');
   if(!link)return;
   const plan=link.dataset.performance==='plan'&&planDaily;
   $('performance-scope').value=plan?'plan':'full';
-  if(plan)setTrendRange(planDaily.start,end);
+  if(plan)setTrendRange(trendDates.indexOf(rows[planDaily.start][0]),trendDates.length-1);
   else if(link.dataset.performance==='all')chooseRecent(0);
   else {
    renderLinkedReturns();
-   updateLinkedReadout(markedDay??rows[markedWeek][0],rows[markedWeek][0]);
+   updateLinkedReadout(hoverDay ?? markedDay);
   }
  });
 }
@@ -334,75 +376,77 @@ function bindLinkedReturns() {
 function tradeMarkers(plot, y, first, last) {
  let svg = '';
  for (const trade of model.trades) {
-  if (trade.i < first || trade.i > last || trade.kind !== 'buy') continue;
-  svg += '<circle data-week="'+trade.i+'" cx="'+plot.x(trade.i)+'" cy="'+y(bars[trade.i].r)+
-   '" r="3.7" fill="'+(trade.asset?'var(--blue)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';
- }
- for (const trade of model.trades) {
-  if (trade.i < first || trade.i > last || trade.kind !== 'sell') continue;
-  const cx = plot.x(trade.i), cy = y(bars[trade.i].r), full = trade.part === 1;
-  const tip = full ? 30 : 15;
-  svg += '<g data-week="'+trade.i+'" data-sale="'+trade.i+'"><title>'+rows[trade.i][0]+' '+ASSETS[trade.asset]+' '+saleName(trade)+
+  const date = rows[trade.i][0];
+  if (date < trendDates[first] || date > trendDates[last]) continue;
+  const day = trendDates.indexOf(date), cx = plot.x(day), cy = y(ratioAt(day));
+  if (trade.kind === 'buy') {
+   svg += '<circle data-day="'+day+'" cx="'+cx+'" cy="'+cy+'" r="3.7" fill="'+
+    (trade.asset?'var(--blue)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';
+   continue;
+  }
+  const full = trade.part === 1, tip = full ? 30 : 15;
+  svg += '<g data-day="'+day+'"><title>'+date+' '+ASSETS[trade.asset]+' '+saleName(trade)+
    '</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="var(--amber)" stroke-opacity=".47" stroke-dasharray="2 3"/><path d="M'+(cx-4.8)+' '+(tip-8)+
    'h9.6l-4.8 8Z" stroke="var(--amber)" stroke-width="1.5" fill="'+(full?'var(--amber)':'var(--surface)')+'"/></g>';
  }
  return svg;
 }
 
-function tradesAt(week) {
- return model.trades.filter(trade => trade.i === week);
+function tradesAt(day) {
+ const week = tradeWeeks.get(trendDates[day]);
+ return week===undefined?[]:model.trades.filter(trade=>trade.i===week);
 }
 
-function formatIndexPoint(week, column) {
- const value = rows[week][column], change = normalizedPoint(week, column) / 100 - 1;
+function formatIndexPoint(day, column) {
+ const value = trendQuotes[day][column], change = normalizedPoint(day, column) / 100 - 1;
  return pointFormat.format(value)+' 点（'+(change>0?'+':'')+pct(change)+'）';
 }
 
-function updateTrendReadouts(week, dailyDay) {
- const bar = bars[week], trades = tradesAt(week);
- const day = rows[week][0];
+function updateTrendReadouts(index) {
+ const ratio = ratioAt(index), band = bandAt(index), trades = tradesAt(index);
+ const day = trendDates[index], zone = dailyZone(ratio,band);
+ const position = zone===null?'两线之间':ASSETS[zone]+'观察区';
  $('readout').innerHTML = '<time datetime="'+day+'">'+day+'</time>'+
-  '<span>比值 <b>'+f(bar.r)+'</b></span><span>下线 <b>'+f(bar.low)+'</b></span><span>上线 <b>'+f(bar.high)+'</b></span>';
+  '<span>收盘比值 <b>'+f(ratio)+'</b></span><span>下线 <b>'+f(band.low)+'</b></span><span>上线 <b>'+f(band.high)+
+  '</b></span><span>'+position+'</span>';
  const tradeReadout = $('trade-readout');
  tradeReadout.hidden = !trades.length;
  tradeReadout.innerHTML = trades.map(trade => '<li class="'+trade.kind+'"><strong>'+
   (trade.kind==='buy'?'买入':saleName(trade))+'</strong><span>'+ASSETS[trade.asset]+'</span></li>').join('');
  $('index-readout').innerHTML = '<time datetime="'+day+'">'+day+'</time>'+
-  '<span><b class="red">红利</b> '+formatIndexPoint(week, 1)+'</span>'+
-  '<span><b class="blue">创业板</b> '+formatIndexPoint(week, 2)+'</span>';
+  '<span><b class="red">红利</b> '+formatIndexPoint(index, 1)+'</span>'+
+  '<span><b class="blue">创业板</b> '+formatIndexPoint(index, 2)+'</span>';
  for (const view of chartViews) {
-  const p = view.geometry, marker = p.el.querySelector('.week-marker'), x = p.x(week);
+  const p = view.geometry, marker = p.el.querySelector('.week-marker'), x = p.x(index);
   marker.setAttribute('transform', 'translate('+x+' 0)');
   const line = marker.querySelector('line');
   line.setAttribute('y1', view.top);
   line.setAttribute('y2', p.base);
   const diamond = marker.querySelector('.ratio-diamond');
   if (diamond) {
-   diamond.setAttribute('transform', 'translate(0 '+view.y(bar.r)+') rotate(45)');
+   diamond.setAttribute('transform', 'translate(0 '+view.y(ratio)+') rotate(45)');
    continue;
   }
-  const values = [normalizedPoint(week, 1), normalizedPoint(week, 2)];
+  const values = [normalizedPoint(index, 1), normalizedPoint(index, 2)];
   const colors = ['var(--up)','var(--blue)'];
   marker.querySelectorAll('circle').forEach((dot, i) => {
    dot.setAttribute('cy', view.y(values[i]));
    dot.setAttribute('fill', colors[i]);
   });
  }
- updateLinkedReadout(dailyDay??day,day);
+ updateLinkedReadout(index);
 }
 
-function selectTrendWeek(week, day=null) {
- markedWeek = week;
- markedDay = day;
- hoverWeek = null;
+function selectTrendDay(index) {
+ markedDay = index;
  hoverDay = null;
- $('cursor').value = week;
- updateTrendReadouts(week,day);
+ $('cursor').value = index;
+ updateTrendReadouts(index);
 }
 
-function weekAtPointer(view, e) {
- const mark = e.target.closest?.('[data-week]');
- if (mark) return Number(mark.dataset.week);
+function dayAtPointer(view, e) {
+ const mark = e.target.closest?.('[data-day]');
+ if (mark) return Number(mark.dataset.day);
  const p = view.geometry;
  return trendRange.first + closestTimeIndex(p.times,timeAtPointer(p,e));
 }
@@ -420,10 +464,11 @@ function closestTimeIndex(times,time) {
  return i;
 }
 
-function showTrendTip(view, e, week) {
- const tip = $(view.tip), bar = bars[week];
- const lines = view.index ? [rows[week][0], '红利 '+formatIndexPoint(week, 1), '创业板 '+formatIndexPoint(week, 2)] :
-  [rows[week][0]+' · 比值 '+f(bar.r), '观察线 '+f(bar.low)+' / '+f(bar.high), ...tradesAt(week).map(trade => (trade.kind==='buy'?'买入':saleName(trade))+' '+ASSETS[trade.asset])];
+function showTrendTip(view, e, index) {
+ const tip = $(view.tip), band = bandAt(index), day = trendDates[index];
+ const lines = view.index ? [day, '红利 '+formatIndexPoint(index, 1), '创业板 '+formatIndexPoint(index, 2)] :
+  [day+' · 收盘比值 '+f(ratioAt(index)), '观察线 '+f(band.low)+' / '+f(band.high),
+   ...tradesAt(index).map(trade => (trade.kind==='buy'?'模拟买入':'模拟'+saleName(trade))+' '+ASSETS[trade.asset])];
  tip.textContent = lines.join('\n');
  tip.hidden = false;
  const r = $(view.plot).getBoundingClientRect();
@@ -448,38 +493,36 @@ function bindTrendPlot(view) {
  const plot = $(view.plot), tip = $(view.tip);
  plot.onpointerdown = e => {
   if (e.button !== 0) return;
-  const week = weekAtPointer(view, e);
+  const day = dayAtPointer(view, e);
   if (e.pointerType === 'touch') return;
-  dragSelection = { week, x: e.clientX, pointer: e.pointerId };
+  dragSelection = { day, x: e.clientX, pointer: e.pointerId };
   plot.setPointerCapture(e.pointerId);
  };
  plot.onpointermove = e => {
   if (e.pointerType === 'touch') return;
-  const week = weekAtPointer(view, e);
-  hoverWeek = week;
-  hoverDay = null;
-  updateTrendReadouts(week);
+  const day = dayAtPointer(view, e);
+  hoverDay = day;
+  updateTrendReadouts(day);
   if (dragSelection?.pointer === e.pointerId) {
    tip.hidden = true;
-   if (Math.abs(e.clientX-dragSelection.x)>7) shadeSelection(dragSelection.week, week);
-  } else showTrendTip(view, e, week);
+   if (Math.abs(e.clientX-dragSelection.x)>7) shadeSelection(dragSelection.day, day);
+  } else showTrendTip(view, e, day);
  };
  plot.onpointerup = e => {
-  if (e.pointerType === 'touch') { selectTrendWeek(weekAtPointer(view,e)); return; }
+  if (e.pointerType === 'touch') { selectTrendDay(dayAtPointer(view,e)); return; }
   if (dragSelection?.pointer !== e.pointerId) return;
-  const a = dragSelection.week, b = weekAtPointer(view, e);
+  const a = dragSelection.day, b = dayAtPointer(view, e);
   const zoom = Math.abs(e.clientX - dragSelection.x) > 7 && a !== b;
   dragSelection = null;
   shadeSelection(null);
   if (zoom) setTrendRange(Math.min(a,b), Math.max(a,b));
-  else selectTrendWeek(a);
+  else selectTrendDay(a);
  };
  plot.onlostpointercapture = () => { dragSelection = null; shadeSelection(null); };
  plot.onpointerleave = () => {
   tip.hidden = true;
-  hoverWeek = null;
   hoverDay = null;
-  updateTrendReadouts(markedWeek,markedDay);
+  updateTrendReadouts(markedDay);
  };
 }
 
@@ -489,10 +532,10 @@ function setupTrendCharts() {
  $('chart-dates').onsubmit = e => {
   e.preventDefault();
   const from = $('chart-from').value, to = $('chart-to').value;
-  const first = rows.findIndex((row, i) => i >= START && row[0] >= from);
-  const last = rows.findLastIndex(row => row[0] <= to);
+  const first = trendDates.findIndex(day => day >= from);
+  const last = trendDates.findLastIndex(day => day <= to);
   if (first === -1 || last < first) {
-   $('chart-range-status').textContent = '这段日期内没有周收盘数据，请调整起止日期。';
+   $('chart-range-status').textContent = '这段日期内没有日收盘数据，请调整起止日期。';
    return;
   }
   setTrendRange(first, last);
@@ -502,7 +545,7 @@ function setupTrendCharts() {
  $('zoom-out').onclick = () => zoomTrendWindow(false);
  $('pan-back').onclick = () => moveTrendWindow(-1);
  $('pan-forward').onclick = () => moveTrendWindow(1);
- $('cursor').oninput = () => selectTrendWeek(Number($('cursor').value));
+ $('cursor').oninput = () => selectTrendDay(Number($('cursor').value));
  const observer = new ResizeObserver(() => { if (trendRange) renderTrendCharts(); });
  bindLinkedReturns();
  observer.observe($('linked-return-plot'));

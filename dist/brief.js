@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id), f=n=>n.toFixed(3), fmt=n=>Math.round(n)
 function get(key,alt){try{return JSON.parse(localStorage.getItem('rotation1:'+key))??alt}catch{return alt}}
 function save(key,v){try{localStorage.setItem('rotation1:'+key,JSON.stringify(v));return true}catch{return false}}
 const shanghai=()=>new Date(Date.now()+8*3600000).toISOString().slice(0,10);
-let extra=get('rows',[]),rows,bars,model,end,range=0;
+let extra=get('rows',[]),rows,bars,model,end;
 function validRow(r){return Array.isArray(r)&&r.length===5&&/^\d{4}-\d\d-\d\d$/.test(r[0])&&r.slice(1).every(n=>Number.isFinite(n)&&n>0);}
 if(!Array.isArray(extra))extra=[];
 extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
@@ -14,7 +14,7 @@ function refresh(){
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
  const selected=$('start').value||get('start',rows[end][0]);$('start').replaceChildren(...rows.slice(START).map((r,j)=>new Option(r[0],r[0])).reverse());
  $('start').value=rows.some((r,i)=>i>=START&&r[0]===selected)?selected:rows[end][0];save('start',$('start').value);
- $('undo').disabled=!extra.length;draw();plan();history();
+ $('undo').disabled=!extra.length;refreshTrendCharts();plan();history();
 }
 function exitPlan(side,stage){
  const held=side===null?'空仓':ASSETS[side],other=side===null?'另一边':ASSETS[1-side];
@@ -111,55 +111,14 @@ function installTableControls(){
  filterSales();
 }
 $('asset-filter').onchange=filterSales;
-function draw(reset=true){
- const el=$('plot'),width=Math.max(275,el.clientWidth),height=el.clientHeight,left=35,right=11,top=34,bottom=26;
- const first=range?Math.max(START,end-range+1):START,visible=bars.slice(first),vals=visible.flatMap(m=>[m.r,m.low,m.high]);
- const min=Math.floor((Math.min(...vals)-.08)*4)/4,max=Math.ceil((Math.max(...vals)+.08)*4)/4;
- const x=i=>left+(width-left-right)*(i-first)/(end-first),y=v=>top+(height-top-bottom)*(max-v)/(max-min);
- const path=(k,step)=>visible.map((m,j)=>j&&step?'H'+x(first+j)+'V'+y(m[k]):(j?'L':'M')+x(first+j)+' '+y(m[k])).join(' ');
- const cursor=$('cursor');cursor.min=first;cursor.max=end;if(reset)cursor.value=end;const i=+cursor.value;
- let out='';for(let v=min;v<=max+.0001;v+=max-min<=1?.25:.5){out+='<path d="M'+left+' '+y(v)+'H'+(width-right)+'" stroke="var(--grid)"/><text x="0" y="'+(y(v)+4)+'">'+v.toFixed(2)+'</text>';}
- for(const [k,col] of [['low','var(--low-line)'],['high','var(--high-line)'],['r','var(--trace)']])out+='<path d="'+path(k,k!=='r')+'" fill="none" stroke="'+col+'" stroke-width="'+(k==='r'?1.8:1.1)+'" '+(k==='r'?'':'stroke-dasharray="4 3"')+'/>';
- for(const r of model.rounds)for(const lot of r.lots){if(lot.i>=first)out+='<circle cx="'+x(lot.i)+'" cy="'+y(bars[lot.i].r)+'" r="3.7" fill="'+(r.asset?'var(--brand)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';}
- for(const t of model.trades){
-  if(t.kind!=='sell'||t.i<first)continue;
-  const cx=x(t.i),cy=y(bars[t.i].r),full=t.part===1;
-  // Separate adjacent sales vertically; leave the same-week purchase dot visible.
-  const tip=cy-(full?23:7);
-  out+='<g data-sale="'+t.i+'"><title>'+rows[t.i][0]+' '+ASSETS[t.asset]+' '+saleName(t)+'</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="var(--amber)"/><path d="M'+(cx-4.8)+' '+(tip-8)+'h9.6l-4.8 8Z" stroke="var(--amber)" stroke-width="1.5" fill="'+(full?'var(--amber)':'var(--surface)')+'"/></g>';
- }
- for(let n=0;n<4;n++){const j=Math.round(first+(end-first)*n/3);out+='<text x="'+x(j)+'" y="'+(height-4)+'" text-anchor="'+(n===0?'start':n===3?'end':'middle')+'">'+rows[j][0].slice(0,7)+'</text>';}
- out+='<path stroke="var(--subtle)" stroke-dasharray="2 3" d="M'+x(i)+' '+top+'V'+(height-bottom)+'"/><circle cx="'+x(i)+'" cy="'+y(bars[i].r)+'" r="4" fill="var(--trace)"/>';
- el.setAttribute('viewBox','0 0 '+width+' '+height);el.innerHTML='<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">'+out+'</g>';
- $('readout').textContent=rows[i][0]+'　比值 '+f(bars[i].r)+'　下线 '+f(bars[i].low)+' / 上线 '+f(bars[i].high);
- const acts=model.trades.filter(t=>t.i===i).map(t=>(t.kind==='buy'?'买入':saleName(t))+ASSETS[t.asset]);
- if(acts.length)$('readout').textContent+='　模拟成交：'+acts.join('，');
-}
-$('ranges').onclick=e=>{if(!e.target.matches('button'))return;range=+e.target.dataset.n;for(const b of $('ranges').children)b.setAttribute('aria-pressed',b===e.target);draw();};
-$('cursor').oninput=()=>draw(false);$('plot').onpointerdown=e=>{const rect=$('plot').getBoundingClientRect(),a=+$('cursor').min;$('cursor').value=e.target.closest('[data-sale]')?.dataset.sale??Math.round(a+(end-a)*Math.min(1,Math.max(0,(e.clientX-rect.left-35)/(rect.width-46))));draw(false);};
-$('plot').onpointermove=e=>{
- if(e.pointerType==='touch')return;
- const box=$('plot').getBoundingClientRect(),first=+$('cursor').min;
- const fraction=Math.min(1,Math.max(0,(e.clientX-box.left-35)/(box.width-46)));
- const i=Number(e.target.closest('[data-sale]')?.dataset.sale??Math.round(first+(end-first)*fraction));
- const trades=model.trades.filter(t=>t.i===i).map(t=>(t.kind==='sell'?saleName(t):'买入')+ASSETS[t.asset]);
- const tip=$('plot-tip');
- tip.textContent=[rows[i][0]+' · 比值 '+f(bars[i].r),'观察线 '+f(bars[i].low)+' / '+f(bars[i].high),...trades].join('\n');
- tip.hidden=false;
- tip.style.left=Math.max(0,Math.min(box.width-tip.offsetWidth,e.clientX-box.left+12))+'px';
- tip.style.top=Math.max(0,Math.min(box.height-tip.offsetHeight,e.clientY-box.top+12))+'px';
-};
-$('plot').onpointerleave=()=>{$('plot-tip').hidden=true;};
 $('sales').onclick=e=>{
  const button=e.target.closest('button[data-week]');if(!button)return;
  for(const cell of $('sales').querySelectorAll('.sale-date'))cell.classList.toggle('selected',cell===button);
  const i=+button.dataset.week;
- if(i<+$('cursor').min)$('ranges').querySelector('[data-n="0"]').click();
- $('cursor').value=i;draw(false);$('chart').scrollIntoView({block:'start'});
+ showTradeWeek(i);$('chart').scrollIntoView({block:'start'});
  $('cursor').focus({preventScroll:true});
 };
 $('start').onchange=plan;$('capital').value=get('capital',10000);$('capital').oninput=plan;
-new ResizeObserver(()=>{if(bars)draw(false)}).observe($('plot'));
 function monday(s){const n=new Date(s+'T00:00:00Z');return +n-(n.getUTCDay()+6)%7*DAY;}
 $('append').onsubmit=e=>{
  e.preventDefault();const day=$('newDay').value,prior=rows[end][0],r=[day,...[0,1,2,3].map(j=>Number($('p'+j).value))];
@@ -174,7 +133,7 @@ $('sold').value=actual.half&&actual.day===(extra.at(-1)||weeklyData.at(-1))[0]?'
 $('basis').value=get('basis','model');$('basis').onchange=mode;
 for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='0';plan();};
 if($('basis').value==='actual')$('capital').value=actual.capital||10000;
-refresh();mode();
+setupTrendCharts();refresh();mode();
 
 const navLinks=[...document.querySelectorAll('nav a')];
 function selectNav(hash){

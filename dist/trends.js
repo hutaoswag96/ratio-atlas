@@ -1,6 +1,6 @@
 'use strict';
 
-const plotInset = { left: 49, right: 13, bottom: 26 };
+const plotInset = { right: 13, bottom: 26 };
 const pointFormat = new Intl.NumberFormat('zh-CN', {
  minimumFractionDigits: 2, maximumFractionDigits: 2
 });
@@ -104,12 +104,13 @@ function makePlot(view) {
  const el = $(view.plot);
  const { first, last } = trendRange;
  const width = el.clientWidth, height = el.clientHeight;
+ const left = parseFloat(getComputedStyle(el).getPropertyValue('--chart-axis-width'));
  const right = width - plotInset.right, base = height - plotInset.bottom;
  const times = rows.slice(first, last + 1).map(row => Date.parse(row[0]));
  const duration = times.at(-1) - times[0];
- const x = i => plotInset.left + (right - plotInset.left) *
+ const x = i => left + (right - left) *
   (duration ? (times[i-first] - times[0]) / duration : .5);
- return { el, width, height, right, base, x, times, duration };
+ return { el, width, height, left, right, base, x, times, duration };
 }
 
 function normalizedPoint(week, column) {
@@ -147,8 +148,8 @@ function renderTrendCharts() {
   view.geometry = p;
   view.y = y;
   let svg = axis.ticks.map(value =>
-   '<path d="M'+plotInset.left+' '+y(value)+'H'+p.right+'" stroke="var(--grid)"/>'+
-   '<text x="'+(plotInset.left-7)+'" y="'+(y(value)+4)+'" text-anchor="end">'+Number(value.toFixed(axis.digits))+'</text>'
+   '<path d="M'+p.left+' '+y(value)+'H'+p.right+'" stroke="var(--grid)"/>'+
+   '<text x="'+(p.left-7)+'" y="'+(y(value)+4)+'" text-anchor="end">'+Number(value.toFixed(axis.digits))+'</text>'
   ).join('');
   for (const line of series) {
    const d = line.values.map((value,j) => j && line.step ?
@@ -157,7 +158,7 @@ function renderTrendCharts() {
     (line.dashed?' stroke-dasharray="5 3"':'')+'/>';
   }
   if (!view.index) svg += tradeMarkers(p, y, first, last);
-  const tickCount = Math.min(indices.length, Math.max(2, Math.floor((p.right-plotInset.left)/88)+1));
+  const tickCount = Math.min(indices.length, Math.max(2, Math.floor((p.right-p.left)/88)+1));
   for (let n = 0; n < tickCount; n++) {
    const j = tickCount === 1 ? first : Math.round(first + (last-first)*n/(tickCount-1));
    const anchor = tickCount === 1 ? 'middle' : n === 0 ? 'start' : n === tickCount-1 ? 'end' : 'middle';
@@ -201,12 +202,16 @@ function formatIndexPoint(week, column) {
 
 function updateTrendReadouts(week) {
  const bar = bars[week], trades = tradesAt(week);
- $('readout').textContent = rows[week][0]+'　比值 '+f(bar.r)+'　下线 '+f(bar.low)+' / 上线 '+f(bar.high);
+ const day = rows[week][0];
+ $('readout').innerHTML = '<time datetime="'+day+'">'+day+'</time>'+
+  '<span>比值 <b>'+f(bar.r)+'</b></span><span>下线 <b>'+f(bar.low)+'</b></span><span>上线 <b>'+f(bar.high)+'</b></span>';
  const tradeReadout = $('trade-readout');
  tradeReadout.hidden = !trades.length;
  tradeReadout.innerHTML = trades.map(trade => '<li class="'+trade.kind+'"><strong>'+
   (trade.kind==='buy'?'买入':saleName(trade))+'</strong><span>'+ASSETS[trade.asset]+'</span></li>').join('');
- $('index-readout').textContent = rows[week][0]+'　红利 '+formatIndexPoint(week, 1)+'　创业板 '+formatIndexPoint(week, 2);
+ $('index-readout').innerHTML = '<time datetime="'+day+'">'+day+'</time>'+
+  '<span><b class="red">红利</b> '+formatIndexPoint(week, 1)+'</span>'+
+  '<span><b class="blue">创业板</b> '+formatIndexPoint(week, 2)+'</span>';
  for (const view of chartViews) {
   const p = view.geometry, marker = p.el.querySelector('.week-marker'), x = p.x(week);
   marker.setAttribute('transform', 'translate('+x+' 0)');
@@ -238,7 +243,7 @@ function weekAtPointer(view, e) {
  const mark = e.target.closest?.('[data-week]');
  if (mark) return Number(mark.dataset.week);
  const p = view.geometry, x = e.clientX - p.el.getBoundingClientRect().left;
- const fraction = keepBetween((x-plotInset.left)/(p.right-plotInset.left), 0, 1);
+ const fraction = keepBetween((x-p.left)/(p.right-p.left), 0, 1);
  const date = p.times[0] + fraction * p.duration;
  let j = p.times.findIndex(time => time >= date);
  if (j < 0) j = p.times.length - 1;
@@ -275,7 +280,7 @@ function bindTrendPlot(view) {
  plot.onpointerdown = e => {
   if (e.button !== 0) return;
   const week = weekAtPointer(view, e);
-  if (e.pointerType === 'touch') { selectTrendWeek(week); return; }
+  if (e.pointerType === 'touch') return;
   dragSelection = { week, x: e.clientX, pointer: e.pointerId };
   plot.setPointerCapture(e.pointerId);
  };
@@ -290,6 +295,7 @@ function bindTrendPlot(view) {
   } else showTrendTip(view, e, week);
  };
  plot.onpointerup = e => {
+  if (e.pointerType === 'touch') { selectTrendWeek(weekAtPointer(view,e)); return; }
   if (dragSelection?.pointer !== e.pointerId) return;
   const a = dragSelection.week, b = weekAtPointer(view, e);
   const zoom = Math.abs(e.clientX - dragSelection.x) > 7 && a !== b;
@@ -319,6 +325,7 @@ function setupTrendCharts() {
    return;
   }
   setTrendRange(first, last);
+  if (matchMedia('(max-width: 700px)').matches) $('chart-date-panel').open = false;
  };
  $('zoom-in').onclick = () => zoomTrendWindow(true);
  $('zoom-out').onclick = () => zoomTrendWindow(false);

@@ -47,7 +47,12 @@ function plan(){
  $('headline').dataset.tone=stale||title.includes('卖')||title.includes('赎回')?'warning':title.includes('买入')||title.includes('申购')||title.includes('准备第')?'buy':'neutral';
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'数据已超过一个交易周。请在页末补录后再参考执行单。':why;
  const stage=action?.kind==='sell'?(action.part===1?2:1):0;
- let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':stage?'已停止':'待买')+'</b><small>'+(lot?rows[lot.i][0]:stage?'':'20%')+'</small></div>';}
+ const steps=Array.from({length:5},(_,j)=>{
+  const lot=round?.lots[j], day=lot?rows[lot.i][0]:'';
+  const date=day?'<time datetime="'+day+'" aria-label="'+day+'"><span class="step-date-full">'+day+'</span><span class="step-date-short">'+day.slice(5)+'</span></time>':stage?'':'20%';
+  return '<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+
+   (lot?'已买入':stage?'已停止':'待买')+'</b><small>'+date+'</small></div>';
+ }).join('');
  body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
  const nextBuy=action?.kind==='buy'?{asset:action.asset,budget:p.budget/5}:null;
  renderExecution(body,p.side,stage,nextBuy);
@@ -186,3 +191,10 @@ visibleSection();
 for (const link of document.querySelectorAll('.data-dates a')) {
  link.addEventListener('click', () => { $('data').open = true; });
 }
+
+const mobileLayout = matchMedia('(max-width: 700px)');
+function syncChartDatePanel() {
+ $('chart-date-panel').open = !mobileLayout.matches;
+}
+syncChartDatePanel();
+mobileLayout.addEventListener('change', syncChartDatePanel);

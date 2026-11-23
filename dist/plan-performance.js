@@ -64,6 +64,7 @@ function lotHistory(round, lot) {
 function renderPlanLots(rounds) {
  const container = $('plan-lots');
  if (!rounds.length) { container.replaceChildren(); return; }
+ const expanded = container.querySelector('.plan-lot-list')?.open ?? !matchMedia('(max-width: 700px)').matches;
  const open = new Set([...container.querySelectorAll('.plan-lot[open]')].map(detail => detail.dataset.lot));
  const roundsHTML = rounds.map((round, index) => {
   const lotsHTML = round.lots.map((lot, slot) => {
@@ -77,15 +78,20 @@ function renderPlanLots(rounds) {
   }).join('');
   return `<section class="lot-round"><h4>第 ${index+1} 轮 · ${ASSETS[round.asset]}</h4>${lotsHTML}</section>`;
  });
- container.innerHTML = '<h3>逐笔收益与回撤</h3><p class="meta">展开任意一笔查看从买入到卖清或最新周线的走势。</p>'+roundsHTML.reverse().join('');
+ const totalLots = rounds.reduce((sum,round)=>sum+round.lots.length,0);
+ container.innerHTML = '<details class="plan-lot-list" '+(expanded?'open':'')+'><summary>逐笔收益与回撤 <span>'+
+  totalLots+' 笔</span></summary><p class="meta">展开任意一笔查看从买入到卖清或最新周线的走势。</p>'+
+  roundsHTML.reverse().join('')+'</details>';
+ const list = container.querySelector('.plan-lot-list');
  for (const round of rounds) for (const lot of round.lots) {
   const detail = container.querySelector('[data-lot="'+lot.i+'"]');
   const show = () => {
    const panel = detail.querySelector('.lot-detail');
-   if (!detail.open || panel.childElementCount) return;
+   if (!list.open || !detail.open || panel.childElementCount) return;
    renderLotChart(panel, round, lot);
   };
   detail.addEventListener('toggle', show);
+  list.addEventListener('toggle', show);
   show();
  }
 }

@@ -5,7 +5,7 @@ const pointFormat = new Intl.NumberFormat('zh-CN', {
  minimumFractionDigits: 2, maximumFractionDigits: 2
 });
 const chartViews = [
- { plot: 'plot', tip: 'plot-tip', selection: 'ratio-selection', top: 36, index: false },
+ { plot: 'plot', tip: 'plot-tip', selection: 'ratio-selection', top: 43, index: false },
  { plot: 'index-plot', tip: 'index-tip', selection: 'index-selection', top: 15, index: true }
 ];
 
@@ -182,17 +182,16 @@ function tradeMarkers(plot, y, first, last) {
  for (const trade of model.trades) {
   if (trade.i < first || trade.i > last || trade.kind !== 'sell') continue;
   const cx = plot.x(trade.i), cy = y(bars[trade.i].r), full = trade.part === 1;
-  const tip = cy - (full ? 23 : 7);
+  const tip = full ? 30 : 15;
   svg += '<g data-week="'+trade.i+'" data-sale="'+trade.i+'"><title>'+rows[trade.i][0]+' '+ASSETS[trade.asset]+' '+saleName(trade)+
-   '</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="var(--amber)"/><path d="M'+(cx-4.8)+' '+(tip-8)+
+   '</title><path d="M'+cx+' '+(cy-4)+'V'+tip+'" stroke="var(--amber)" stroke-opacity=".47" stroke-dasharray="2 3"/><path d="M'+(cx-4.8)+' '+(tip-8)+
    'h9.6l-4.8 8Z" stroke="var(--amber)" stroke-width="1.5" fill="'+(full?'var(--amber)':'var(--surface)')+'"/></g>';
  }
  return svg;
 }
 
 function tradesAt(week) {
- return model.trades.filter(trade => trade.i === week)
-  .map(trade => (trade.kind === 'buy' ? '买入' : saleName(trade)) + ASSETS[trade.asset]);
+ return model.trades.filter(trade => trade.i === week);
 }
 
 function formatIndexPoint(week, column) {
@@ -202,8 +201,11 @@ function formatIndexPoint(week, column) {
 
 function updateTrendReadouts(week) {
  const bar = bars[week], trades = tradesAt(week);
- $('readout').textContent = rows[week][0]+'　比值 '+f(bar.r)+'　下线 '+f(bar.low)+' / 上线 '+f(bar.high)+
-  (trades.length ? '　模拟成交 '+trades.join('，') : '');
+ $('readout').textContent = rows[week][0]+'　比值 '+f(bar.r)+'　下线 '+f(bar.low)+' / 上线 '+f(bar.high);
+ const tradeReadout = $('trade-readout');
+ tradeReadout.hidden = !trades.length;
+ tradeReadout.innerHTML = trades.map(trade => '<li class="'+trade.kind+'"><strong>'+
+  (trade.kind==='buy'?'买入':saleName(trade))+'</strong><span>'+ASSETS[trade.asset]+'</span></li>').join('');
  $('index-readout').textContent = rows[week][0]+'　红利 '+formatIndexPoint(week, 1)+'　创业板 '+formatIndexPoint(week, 2);
  for (const view of chartViews) {
   const p = view.geometry, marker = p.el.querySelector('.week-marker'), x = p.x(week);
@@ -242,7 +244,7 @@ function weekAtPointer(view, e) {
 function showTrendTip(view, e, week) {
  const tip = $(view.tip), bar = bars[week];
  const lines = view.index ? [rows[week][0], '红利 '+formatIndexPoint(week, 1), '创业板 '+formatIndexPoint(week, 2)] :
-  [rows[week][0]+' · 比值 '+f(bar.r), '观察线 '+f(bar.low)+' / '+f(bar.high), ...tradesAt(week)];
+  [rows[week][0]+' · 比值 '+f(bar.r), '观察线 '+f(bar.low)+' / '+f(bar.high), ...tradesAt(week).map(trade => (trade.kind==='buy'?'买入':saleName(trade))+' '+ASSETS[trade.asset])];
  tip.textContent = lines.join('\n');
  tip.hidden = false;
  const r = $(view.plot).getBoundingClientRect();

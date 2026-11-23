@@ -16,13 +16,6 @@ function refresh(){
  $('start').value=rows.some((r,i)=>i>=START&&r[0]===selected)?selected:rows[end][0];save('start',$('start').value);
  $('undo').disabled=!extra.length;refreshTrendCharts();plan();history();showDailyClose();
 }
-function exitPlan(side,stage){
- const held=side===null?'空仓':ASSETS[side],other=side===null?'另一边':ASSETS[1-side];
- const status=side===null?'空仓，无持仓可卖':stage===1?'已确认换边，准备减半':'持有'+held+'，等待换仓信号';
- if(stage===2)return '<section class="exit-plan"><h4>卖出安排</h4><p><b>第一笔已卖出 · 剩余份额待清仓</b></p><p>下一共同交易周收盘卖清'+held+'剩余的全部份额，同时用当时账户总额的 20% 买入'+other+'。这一步沿用已确认的换仓信号。</p></section>';
- const trigger=side===null?'持仓后，等另一边进入观察区并确认转强。':(side===0?'创业板进入高位观察区，观察期内比值低于 13 周均值。':'红利进入低位观察区，观察期内比值高于 13 周均值。');
- return '<section class="exit-plan"><h4>卖出安排</h4><p><b>'+status+'</b></p><p class="meta">触发条件：'+trigger+'</p><ol><li>确认后的下一周收盘，卖掉旧仓份额的 <b>50%</b>。</li><li>再下一周收盘，卖掉<b>全部剩余份额</b>，同时用当时账户总额的 20% 买入'+other+'。</li></ol></section>';
-}
 function saleName(t){return t.part===1?'卖清':'卖一半';}
 function plan(){
  const start=rows.findIndex(r=>r[0]===$('start').value),capital=Number($('capital').value),body=$('planBody');
@@ -30,14 +23,16 @@ function plan(){
  if($('basis').value==='actual'){clearPlanPerformance();actualPlan(start,capital);return;}
  const p=simulate(rows,bars,start,capital),q=p.orders,action=q[0],stale=elapsed(shanghai(),rows[end][0])>=8;
  const known=p.watch!==null&&end-p.touch<13,asset=p.side===null?'现金':ASSETS[p.side],round=p.rounds.at(-1);
- const title=action?.kind==='sell'?(q.length===2?'卖清并换边':'旧仓卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
- let why=action?.kind==='sell'?(q.length===2?'上一周已卖出一半。下周收盘卖清，同时用新一轮资金的 20% 买入'+ASSETS[q[1].asset]+'。':'另一边已经确认转强。下周收盘卖出旧仓的一半。'):action?'下一共同交易周收盘，计划投入 '+fmt(p.budget/5)+' 元。':p.side===null?(known?'已经进入观察窗口，等待比值满足 13 周均线条件。':'从所选起点观察，尚无有效建仓信号，保留现金。'):p.count===5?'本轮五笔已到位，等待另一侧入区并确认转强。':'等上一笔成交满 28 天，在首个周收盘检查加仓条件。';
+ const title=action?.kind==='sell'?(q.length===2?'下一步：卖清旧仓':'下一步：卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
+ let why=action?.kind==='sell'?(q.length===2?'第一笔卖出已完成。下方按成交顺序列出剩余步骤。':'另一边已经确认转强。下周收盘卖出旧仓的一半。'):action?'下一共同交易周收盘，计划投入 '+fmt(p.budget/5)+' 元。':p.side===null?(known?'已经进入观察窗口，等待比值满足 13 周均线条件。':'从所选起点观察，尚无有效建仓信号，保留现金。'):p.count===5?'本轮五笔已到位，等待另一侧入区并确认转强。':'等上一笔成交满 28 天，在首个周收盘检查加仓条件。';
  $('signalLabel').textContent=(stale?'历史参考':'最新周线判断')+'　/　'+(start===end?'本周空仓起步':'按 '+rows[start][0]+' 起步');
  $('headline').dataset.tone=stale||title.includes('卖')?'warning':title.includes('买入')||title.includes('准备第')?'buy':'neutral';
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'数据已超过一个交易周。请在页末补录后再参考执行单。':why;
- let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':'待买')+'</b><small>'+(lot?rows[lot.i][0]:'20%')+'</small></div>';}
+ const stage=action?.kind==='sell'?(action.part===1?2:1):0;
+ let steps='';for(let j=0;j<5;j++){const lot=round?.lots[j];steps+='<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(lot?'已模拟买入':stage?'已停止':'待买')+'</b><small>'+(lot?rows[lot.i][0]:stage?'':'20%')+'</small></div>';}
  body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
- body.insertAdjacentHTML('beforeend',exitPlan(p.side,action?.kind==='sell'?(action.part===1?2:1):0));
+ const nextBuy=action?.kind==='buy'?{asset:action.asset,budget:p.budget/5}:null;
+ renderExecution(body,p.side,stage,nextBuy);
  renderPlanPerformance(p,start,capital);
  save('capital',capital);save('start',$('start').value);
 }
@@ -49,20 +44,21 @@ function actualPlan(start,capital){
  while(touch>=Math.max(start,end-12)&&bars[touch].zone===null)touch--;
  const watch=touch>=Math.max(start,end-12)?bars[touch].zone:null;
  const confirmed=watch!==null&&(watch===0?m.r>m.avg:m.r<m.avg);
- let title,note;
- if(half){title='卖清旧仓并换边';note='你已记录本周按换仓信号卖出一半。下一共同交易周收盘卖清，同时按届时账户总额的 20% 买入'+ASSETS[1-asset]+'。';}
- else if(asset!==null&&confirmed&&watch!==asset){title='卖出'+ASSETS[asset]+'的一半';note='对侧已入区并确认转强。下一共同周收盘先卖一半，再下一周卖清并开始新一轮。';}
- else if(asset===null){title=confirmed?'开始买入'+ASSETS[watch]:'空仓等待';note=confirmed?'下一共同周收盘买入第一份，预算约 '+fmt(capital/5)+' 元。':'从所选起点观察，本周未同时满足入区和转强条件。';}
+ let title,note,nextBuy=null;
+ if(half){title='下一步：卖清旧仓';note='你已记录卖出一半。接下来先卖清旧仓，具体步骤见下方。';}
+ else if(asset!==null&&confirmed&&watch!==asset){title='卖出'+ASSETS[asset]+'的一半';note='对侧已入区并确认转强。先处理旧仓，按下方顺序执行。';}
+ else if(asset===null){title=confirmed?'开始买入'+ASSETS[watch]:'空仓等待';note=confirmed?'下一共同周收盘买入第一份，预算约 '+fmt(capital/5)+' 元。':'从所选起点观察，本周未同时满足入区和转强条件。';if(confirmed)nextBuy={asset:watch,budget:capital/5};}
  else if(filled===5){title='继续持有'+ASSETS[asset];note='本轮五笔已买完，等待对侧确认。';}
  else if(!last||last>day){title='补全最近买入日';note='请填写不晚于数据截止日的实际成交日期，用来判断是否已满 28 天。';}
- else if(elapsed(day,last)>=28){title='准备第 '+(filled+1)+' 笔';note='距离上次买入已满 28 天。若此前没有待成交指令，按本周检查结果，下一共同周收盘买入'+ASSETS[asset]+'约 '+fmt(capital/5)+' 元。';}
+ else if(elapsed(day,last)>=28){title='准备第 '+(filled+1)+' 笔';note='距离上次买入已满 28 天。若此前没有待成交指令，按本周检查结果，下一共同周收盘买入'+ASSETS[asset]+'约 '+fmt(capital/5)+' 元。';nextBuy={asset,budget:capital/5};}
  else{title='等待加仓间隔';note='距离上次成交 '+elapsed(day,last)+' 天，满 28 天后的首个周收盘再次检查。';}
+ const stage=half?2:asset!==null&&confirmed&&watch!==asset?1:0;
  const stale=elapsed(shanghai(),day)>=8;
  $('signalLabel').textContent='实际持仓核对 · '+(asset===null?'现金':ASSETS[asset]);
  $('headline').dataset.tone=stale||title.includes('卖')?'warning':title.includes('买入')||title.includes('准备第')?'buy':'neutral';
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'当前记录已超过一个交易周，请先补录最新收盘数据。':note;
- $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps">'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':'待买')+'</b><small>20%</small></div>').join('')+'</div>';
- $('planBody').insertAdjacentHTML('beforeend',exitPlan(asset,half?2:asset!==null&&confirmed&&watch!==asset?1:0));
+ $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps">'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':stage?'已停止':'待买')+'</b><small>'+(j<filled||!stage?'20%':'')+'</small></div>').join('')+'</div>';
+ renderExecution($('planBody'),asset,stage,nextBuy);
  save('actual',{raw,filled,last,half,capital,day});save('start',$('start').value);
 }
 function mode(){
@@ -134,7 +130,7 @@ $('sold').value=actual.half&&actual.day===(extra.at(-1)||weeklyData.at(-1))[0]?'
 $('basis').value=get('basis','model');$('basis').onchange=mode;
 for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='0';plan();};
 if($('basis').value==='actual')$('capital').value=actual.capital||10000;
-setupTrendCharts();refresh();mode();
+setupTrendCharts();renderFundList();refresh();mode();
 refreshDailyClose();
 addEventListener('focus', refreshDailyClose);
 setInterval(refreshDailyClose, 10 * 60 * 1000);
@@ -149,7 +145,7 @@ function selectNav(hash){
 function visibleSection(){
  if(window.scrollY<12){selectNav('#top');return;}
  const hash=location.hash;
- const ids=['chart','plan','history'];
+ const ids=['plan','chart','history'];
  const visible=ids.filter(id=>{const r=$(id).getBoundingClientRect();return r.top<innerHeight*.40 && r.bottom>92;});
  selectNav(visible.includes(hash.slice(1))?hash:visible.length?'#'+visible.at(-1):$('chart').getBoundingClientRect().top>0?'#top':'');
 }

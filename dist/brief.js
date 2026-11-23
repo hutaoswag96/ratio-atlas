@@ -9,22 +9,13 @@ if(!Array.isArray(extra))extra=[];
 extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
 function refresh(){
  rows=[...weeklyData,...extra];bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
- const m=bars[end];$('asof').textContent=rows[end][0];$('ratio').textContent=f(m.r);$('lo').textContent='红利线 '+f(m.low);$('hi').textContent='创业板线 '+f(m.high);
- drawQuoteSparkline(bars.slice(-26).map(bar=>bar.r));
+ const m=bars[end];$('asof').textContent=rows[end][0];$('weekly-ratio').textContent=rows[end][0]+' · 比值 '+f(m.r);$('lo').textContent='红利线 '+f(m.low);$('hi').textContent='创业板线 '+f(m.high);
  const span=m.high-m.low;$('pointer').style.left=Math.max(0,Math.min(99,20+60*(m.r-m.low)/span))+'%';
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
  const selected=$('start').value||get('start',rows[end][0]);
  refreshStartPicker(selected);
  save('start',$('start').value);
  $('undo').disabled=!extra.length;refreshTrendCharts();plan();history();showDailyClose();
-}
-function drawQuoteSparkline(values) {
- const min=Math.min(...values), max=Math.max(...values), span=max-min;
- const points=values.map((value,i)=>[5+158*i/(values.length-1), span?5+36*(max-value)/span:24]);
- const line=points.map(([x,y],i)=>(i?'L':'M')+x+' '+y).join(' ');
- const [x,y]=points.at(-1);
- $('quote-sparkline').innerHTML='<path class="spark-fill" d="'+line+'L163 47H5Z"/>'+
-  '<path class="spark-line" d="'+line+'"/><circle class="spark-tip" cx="'+x+'" cy="'+y+'" r="3.5"/>';
 }
 function refreshStartPicker(preferred) {
  const dates=rows.slice(START).map(row=>row[0]);

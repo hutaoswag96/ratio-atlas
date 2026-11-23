@@ -46,8 +46,12 @@ function selectStartWeek(date) {
 function saleName(t){return t.part===1?'卖清':'卖一半';}
 function plan(){
  const start=rows.findIndex(r=>r[0]===$('start').value),capital=Number($('capital').value),body=$('planBody');
+ const actual=$('basis').value==='actual', held=$('holding').value;
+ const setup=[actual?'实际持仓核对':'按起点模拟', actual?(held===''?'现金':ASSETS[Number(held)]):rows[start][0]];
+ if(capital>=1&&capital<=1e11)setup.push('¥'+planMoney.format(capital));
+ $('plan-setup-summary').textContent=setup.join(' · ');
  if(!(capital>=1&&capital<=1e11)){clearPlanPerformance();body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('headline').dataset.tone='warning';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
- if($('basis').value==='actual'){clearPlanPerformance();actualPlan(start,capital);return;}
+ if(actual){clearPlanPerformance();actualPlan(start,capital);return;}
  const p=simulate(rows,bars,start,capital),q=p.orders,action=q[0],stale=elapsed(shanghai(),rows[end][0])>=8;
  const known=p.watch!==null&&end-p.touch<13,asset=p.side===null?'现金':ASSETS[p.side],round=p.rounds.at(-1);
  const title=action?.kind==='sell'?(q.length===2?'下一步：卖清旧仓':'下一步：卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
@@ -62,7 +66,9 @@ function plan(){
   return '<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+
    (lot?'已买入':stage?'已停止':'待买')+'</b><small>'+date+'</small></div>';
  }).join('');
- body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p><div class="steps">'+steps+'</div><p class="meta">模拟持仓：'+asset+'　·　本轮每笔预算约 '+fmt(p.budget/5)+' 元　·　按轮初资金等分。</p>';
+ body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p>'+
+  '<div class="steps" '+(round?'':'hidden')+'>'+steps+'</div>'+
+  (round?'<p class="meta">模拟持仓 '+asset+' · 本轮每笔预算约 '+fmt(p.budget/5)+' 元</p>':'');
  const nextBuy=action?.kind==='buy'?{asset:action.asset,budget:p.budget/5}:null;
  renderExecution(body,p.side,stage,nextBuy);
  renderPlanPerformance(p,start,capital);
@@ -71,6 +77,7 @@ function plan(){
 function actualPlan(start,capital){
  const raw=$('holding').value,asset=raw===''?null:Number(raw),filled=asset===null?0:Number($('filled').value);
  const last=$('lastFill').value,half=asset!==null&&$('sold').value==='1',m=bars[end],day=rows[end][0];
+ $('position-fields').hidden = asset===null;
  for(const id of ['filled','lastFill','sold'])$(id).disabled=asset===null;
  let touch=end;
  while(touch>=Math.max(start,end-12)&&bars[touch].zone===null)touch--;
@@ -89,21 +96,22 @@ function actualPlan(start,capital){
  $('signalLabel').textContent='实际持仓核对 · '+(asset===null?'现金':ASSETS[asset]);
  $('headline').dataset.tone=stale||title.includes('卖')||title.includes('赎回')?'warning':title.includes('买入')||title.includes('申购')||title.includes('准备第')?'buy':'neutral';
  $('headline').textContent=stale?'请先更新周线':title;$('reason').textContent=stale?'当前记录已超过一个交易周，请先补录最新收盘数据。':note;
- $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps">'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':stage?'已停止':'待买')+'</b><small>'+(j<filled||!stage?'20%':'')+'</small></div>').join('')+'</div>';
+ $('planBody').innerHTML='<h3>'+(stale?'历史参考 · ':'')+title+'</h3><p>'+note+'</p><div class="steps" '+(asset===null?'hidden':'')+'>'+Array.from({length:5},(_,j)=>'<div class="step '+(j<filled?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+(j<filled?'已买入':stage?'已停止':'待买')+'</b><small>'+(j<filled||!stage?'20%':'')+'</small></div>').join('')+'</div>';
  renderExecution($('planBody'),asset,stage,nextBuy,true);
  save('actual',{raw,filled,last,half,capital,day});save('start',$('start').value);
 }
 function mode(){
  const actual=$('basis').value==='actual';
  $('actualFields').hidden=!actual;$('fundLabel').textContent=actual?'本轮起始资金（元）':'初始资金（元）';
- $('planHelp').textContent=actual?'填写实际成交情况，按最新周收盘核对下一步。手动核对模式不会替你记录成交；每周请核实已买笔数、成交日及换仓进度。':'从所选周空仓起步，逐周按规则模拟。未完全跟随历史交易时，请选择按实际持仓核对。';
+ $('planHelp').textContent=actual?'按最新周收盘核对操作。设置仅存于本浏览器。':'从所选周空仓起步模拟。设置仅存于本浏览器。';
  $('capital').value=actual?(get('actual',{}).capital||10000):get('capital',10000);
  save('basis',$('basis').value);plan();
 }
 function changeClass(value){return value>0?'up':value<0?'down':'';}
 function history(){
  const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
- $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大回撤</span><strong class="'+changeClass(model.draw)+'">'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
+ $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大周线回撤</span><strong class="'+changeClass(model.draw)+'">'+pct(model.draw)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div>';
+ renderHistoryDaily(model);
  const roundSales=model.rounds.filter(r=>r.sales.length).slice().reverse();
  const dateButton=i=>i===undefined?'待成交':'<button type="button" class="sale-date" data-week="'+i+'">'+rows[i][0]+'</button>';
  $('sales').innerHTML=roundSales.length?'<table><thead><tr><th>卖出旧仓</th><th>卖一半</th><th>卖清剩余</th></tr></thead><tbody>'+roundSales.map(r=>'<tr data-asset="'+r.asset+'"><td>'+ASSETS[r.asset]+'</td><td>'+dateButton(r.sales[0])+'</td><td>'+dateButton(r.sales[1])+'</td></tr>').join('')+'</tbody></table>':'尚无模拟卖出成交。';

@@ -302,3 +302,36 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   .plan-form { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .plan-form>.start-picker { grid-area: 2/1/3/-1; }
 }
+
+#plan>.heading { margin-bottom: 10px; }
+.plan-history-link { color: var(--brand); font-size: 14px; min-height: 40px; display: inline-flex; align-items: center; }
+.plan-history-link:hover { text-decoration: underline; }
+#planBody { margin-top: 0; padding: 13px 15px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-tint); }
+#planBody>p { color: var(--muted); font-size: 14px; }
+#plan-settings { margin-top: 10px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; }
+#plan-settings>summary { list-style: none; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; min-height: 46px; }
+#plan-settings>summary::-webkit-details-marker { display: none; }
+#plan-settings>summary::before { content: '›'; display: inline-block; margin-right: -4px; color: var(--brand); }
+#plan-settings[open]>summary::before { transform: rotate(90deg); }
+#plan-setup-summary { margin-left: auto; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+#plan-settings .plan-form { grid-template-columns: repeat(2,minmax(0,1fr)); margin-top: 5px; }
+#plan-settings .start-picker { grid-area: 2/1/3/-1; }
+#plan-settings #position-fields { display: contents; }
+#plan-settings #position-fields[hidden] { display: none; }
+#plan-settings #actualFields .form { align-items: end; }
+.account-plot { display: block; width: 100%; height: clamp(184px,23vw,270px); margin-top: 5px; cursor: crosshair; touch-action: pan-y; }
+.account-cursor output { display: flex; flex-wrap: wrap; gap: 2px 11px; }
+.account-cursor output span { white-space: nowrap; }
+.account-cursor output b { color: var(--ink); font-weight: 600; }
+.performance-ranges { margin-top: 7px; }
+#history-daily { margin-bottom: 19px; }
+#history-daily .account-trend { margin-top: 12px; }
+.daily-curve-note { margin: 8px 0; }
+@media (max-width: 700px) {
+  #plan-settings { padding-inline: 10px; }
+  #plan-setup-summary { margin-left: 0; }
+  #plan-settings #actualFields .form { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .account-plot { height: 205px; }
+  .account-cursor output time { flex-basis: 100%; }
+  .performance-ranges button { min-height: 40px; }
+}

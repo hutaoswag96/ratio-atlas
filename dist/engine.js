@@ -16,7 +16,7 @@ function market(rows){
 }
 function simulate(rows,bars,start,capital=10000){
  let cash=capital,side=null,units=0,budget=cash,regime=null,touch=-100,watch=null,committed=null,lastBuy=null,count=0,orders=[],peak=cash,draw=0;
- const rounds=[],trades=[],nav=[];
+ const rounds=[],trades=[],nav=[],positions=[];
  for(let i=start;i<rows.length;i++){
   const row=rows[i],m=bars[i];
   for(const order of orders){
@@ -38,7 +38,7 @@ function simulate(rows,bars,start,capital=10000){
    }
    trades.push({...order,i});
   }
-  const value=cash+(side===null?0:units*row[3+side]);nav.push(value);peak=Math.max(peak,value);draw=Math.min(draw,value/peak-1);orders=[];
+  const value=cash+(side===null?0:units*row[3+side]);nav.push(value);positions.push({cash,side,units});peak=Math.max(peak,value);draw=Math.min(draw,value/peak-1);orders=[];
   if(committed!==null){orders=[{kind:'sell',asset:side,part:1},{kind:'buy',asset:committed}];committed=null;continue;}
   if(m.zone!==null){watch=m.zone;touch=i;}
   if(i-touch<13 && (watch===0?m.r>m.avg:m.r<m.avg))regime=watch;
@@ -51,5 +51,5 @@ function simulate(rows,bars,start,capital=10000){
   for(const lot of round.lots){const pnl=lot.proceeds+lot.remaining*mark-lot.cost;lot.ret=pnl/lot.cost;gain+=pnl;cost+=lot.cost;}
   round.ret=gain/cost;
  }
- return {side,regime,orders,watch,touch,lastBuy,count,rounds,trades,nav,draw,budget};
+ return {side,regime,orders,watch,touch,lastBuy,count,rounds,trades,nav,positions,draw,budget};
 }

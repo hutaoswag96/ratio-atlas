@@ -1,10 +1,39 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#132a33"><title>比值手记</title><link rel="stylesheet" href="research.css"><script defer src="history.js"></script><script defer src="engine.js"></script><script defer src="research.js"></script></head>
-<body><header><div class="mast"><a class="brand" href="#equity"><span class="monogram" aria-hidden="true">∕</span>比值手记 <em>Ratio Atlas</em></a><nav aria-label="资产对"><a href="#equity">红利 / 创业板</a><a href="#gold">黄金 / 美债</a></nav></div></header>
-<main><section class="headline"><div><div class="over" id="market"></div><h1 id="title"></h1></div><div class="stamp"><span>周度研究快照</span><b id="date"></b></div></section>
-<section class="terminal" aria-label="行情与区间"><div class="chartpane"><div class="quote"><div><span class="dim">收盘比值</span><strong id="quote"></strong></div><div id="change"></div><div id="ranges" class="segments" aria-label="走势图区间"></div></div><div id="plot"></div><div class="chartfoot"><span><i class="line"></i>比值周线</span><span><i class="dotted"></i>季度中位线</span><span><i class="dot"></i>分批首笔信号</span><span id="chartPeriod"></span></div></div><aside><div class="over">季度参考区间</div><h2 id="zone"></h2><small id="cal"></small><div id="ladder"></div><p id="fresh" class="fresh"></p><a id="legacy">查看原固定线及自定义区间 ↗</a></aside></section>
-<div id="assets" class="assets"></div>
-<section class="module"><div class="sectionhead"><div><div class="over">资金分配</div><h2>这一轮怎么做</h2></div><div class="segLight" id="modes"><button data-mode="entry">现金分批建仓</button><button data-mode="monthly">已有两项持仓</button></div></div>
-<div class="planner"><div class="planLead"><h3 id="planTitle"></h3><p id="planCopy"></p><label id="experiment" class="checkbox"><input type="checkbox" id="confirmation">试算转强补仓</label><label>专项模拟预算（元）<input id="budget" type="number" min="1" max="100000000" step="any" value="10000"></label><small>仅包含拨给这一组资产的资金。</small></div><div><div id="steps"></div><div id="now" class="notice" aria-live="polite"></div></div></div></section>
-<section class="module"><div class="sectionhead"><div><div class="over">同区间历史试算</div><h2>多做交易，结果如何</h2></div><small id="testPeriod"></small></div><div id="finding"></div><div class="scroll"><table><thead><tr><th>策略</th><th>首笔轮数 / 调仓次数</th><th>累计收益</th><th>年化收益</th><th>最大回撤</th></tr></thead><tbody id="bench"></tbody></table></div><p id="limits" class="fine"></p></section>
-<section class="module"><div class="sectionhead"><div><div class="over">执行明细</div><h2 id="logTitle"></h2></div><select id="filter" aria-label="筛选历史方向"></select></div><p id="logInfo"></p><div id="log" class="scroll"></div><button id="more" class="subtle">查看更多记录</button></section>
-<details class="module method"><summary>计算方法、风险与数据来源</summary><div id="method"></div></details></main><footer>比值手记 <em>Ratio Atlas</em> <span>个人投资研究</span></footer></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#faf9f6">
+<title>比值手记 · 红利与创业板</title>
+<link rel="stylesheet" href="brief.css"><script defer src="weekly.js"></script><script defer src="lens.js"></script><script defer src="brief.js"></script>
+</head>
+<body>
+<a class="skip" href="#judgment">跳到投资判断</a>
+<header><div class="wrap mast">
+<a class="brand" href="#judgment"><span class="brandmark" aria-hidden="true"><i></i><i></i><i></i></span>比值手记</a>
+<nav aria-label="栏目"><a href="#judgment">本周判断</a><a href="#trend">比值走势</a><a href="#evidence">历史验证</a></nav>
+<a class="methodlink" href="#method">研究方法 <span aria-hidden="true">ⓘ</span></a>
+</div></header>
+<main class="wrap">
+<section id="judgment">
+<div class="reporthead"><div><p class="eyebrow">A 股风格研究 <span>/</span> 周报</p><h1>中证红利 <em>／</em> 创业板指</h1></div>
+<div class="weekpicker"><label for="week">报告周</label><div class="weektools"><button id="prev" aria-label="上一周">‹</button><select id="week" aria-label="选择报告周"></select><button id="next" aria-label="下一周">›</button></div><button class="textlink" id="latest" hidden>回到最新周报</button></div></div>
+<div class="cover">
+<div class="call"><span class="keytag"><i></i>配置意见</span><h2 id="verdict"></h2><p id="reason"></p><div class="action"><b>怎么做</b><span id="action"></span></div></div>
+<div class="gauge"><div class="gaugehead"><span>近三年相对位置</span><strong id="rank"></strong></div><div id="dial"></div><div class="gaugefoot"><span>红利相对低位</span><span>创业板相对低位</span></div></div>
+</div></section>
+<section id="trend" class="section"><div class="headrow"><div><h2>比值走势</h2><p>中证红利收盘点位 ÷ 创业板指收盘点位</p></div><div class="switch" id="range" aria-label="图表区间"></div></div>
+<div class="chartlayout"><div class="chartpanel"><div class="readout"><strong id="ratio"></strong><span id="weeklyChange"></span></div><div id="plot"></div><div class="legend"><span class="keyline"></span>比值周线 <span class="keyband"></span>当时的 20–80 分位区间</div></div>
+<aside class="drivers"><h3>谁在推动比值？</h3><p id="driverDates"></p><div id="moves"></div><div id="driverText"></div></aside></div>
+</section>
+<section class="section" id="allocation"><div class="headrow"><div><h2>新增资金，怎样分给两边？</h2><p>先填当前持仓市值，再把本周意见应用到你原定的配置比例。</p></div><button id="example" class="textlink">载入当周示例</button></div>
+<div class="allocation"><div><div class="inputs"><label>红利持仓（元）<input id="holdA" type="number" min="0" max="100000000000" step="any"></label><label>创业板持仓（元）<input id="holdB" type="number" min="0" max="100000000000" step="any"></label><label>计划新增（元）<input id="newCash" type="number" min="0" max="100000000000" step="any" value="10000"></label><label>原定红利占比（%）<input id="baseline" type="number" min="0" max="100" step="any" value="50"></label></div><p id="exampleNote"></p></div><div class="result" aria-live="polite"><small>本次新增资金分配</small><div id="split"></div><p id="splitNote"></p></div></div></section>
+<section id="evidence" class="section"><div class="headrow"><div><h2>历史上，买落后的一侧有用吗？</h2><p>筛出首次进入同一区间的周，比较随后两项指数的含分红收益。</p></div><label class="hcontrol">观察期 <select id="horizon"><option value="13">13 周</option><option value="26" selected>26 周</option><option value="52">52 周</option></select></label></div>
+<div id="casecards" class="casecards"></div><p class="takeaway" id="takeaway"></p>
+<div class="sampleheader"><h3 id="sampleTitle"></h3><span id="sampleDate"></span></div><div class="overflow"><table><thead><tr><th>信号周</th><th>当周比值</th><th>红利收益</th><th>创业板收益</th><th>红利减创业板</th><th>回看</th></tr></thead><tbody id="records"></tbody></table></div><div class="tablefoot"><span>收益差以百分点计。回看历史周时，后续结果将隐藏。</span><button id="more" class="textlink">查看更多</button></div></section>
+<section id="method" class="section"><details id="methodDetails"><summary>研究方法与数据口径</summary><div class="methodgrid">
+<div><h3>怎样读这个比值</h3><p>比值上升代表红利跑赢创业板，两边都下跌时也可能发生。每周将比值与此前 156 条共同周收盘记录比较。第 20 分位及以下进入红利观察区，第 80 分位及以上进入创业板观察区。处于相对低位，仍可能继续下跌。</p></div>
+<div><h3>什么情况下改变意见</h3><p>区间内侧保持原配置。进入外侧观察区后，还需候选指数近四周相对走强，且当时已到期的 26 周样本至少五组、跑赢超过一半、收益差中位数为正。全部满足才考虑在原计划上向该侧倾斜 5 个百分点，另一侧等量调减；超出可用仓位则以实际仓位为限。</p><p id="ruleAudit"></p><p>这是专项资金的一次目标偏移，每周复查，同一意见不累计加仓。条件消失时恢复原计划。5 个百分点是控制试错规模的示例，规则未经独立实盘验证。</p></div>
+<div><h3>怎样选取历史案例</h3><p>按时间顺序记录状态切换后首次进入该区的周。下一条共同周收盘作为起点，到达指定日历周数后的首条共同周收盘为终点。同一区间内跳过与前一个持有期重叠的信号，不同区间的样本可能重叠。只展示在所选报告周已经到期的结果。变更观察期仅影响历史验证。</p></div>
+<div><h3>数据来自哪里</h3><p id="coverage"></p><p>信号使用中证红利（000922）和创业板指（399006）价格指数。收益验证使用中证红利全收益（H00922）和创业板全收益（399606），包含分红再投资，未计实际基金费率与交易成本。</p><p><a href="https://www.csindex.com.cn/zh-CN/indices/index-detail/000922">中证指数</a> · <a href="https://www.cnindex.com.cn/module/index-detail.html?indexCode=399006">国证指数</a> · <a href="https://gu.qq.com/sh000922/zs">腾讯证券周线</a></p></div>
+</div></details></section>
+</main><footer class="wrap"><b>比值手记</b><span>个人投资研究 · 周度历史快照</span></footer>
+</body></html>

@@ -213,7 +213,7 @@ def build_body(sim, proj, rows, new_trades, new_orders, start_date):
             lines.append(f"{rows[t['i']][0]} · {act}{ASSETS[t['asset']]}")
         for o in new_orders:
             act = '买入' if o['kind'] == 'buy' else ('卖清' if o['part'] == 1 else '卖一半')
-            lines.append(f"下周待执行 · {act}{ASSETS[o['asset']]}")
+            lines.append(f"本周待执行 · {act}{ASSETS[o['asset']]}")
         banner = ('<div style="background:#b42318;color:#fff;padding:16px;font-size:18px;font-weight:700;">'
                   '持仓变化提醒 · ' + '；'.join(lines) + '</div>')
     else:
@@ -222,7 +222,7 @@ def build_body(sim, proj, rows, new_trades, new_orders, start_date):
 
     holding = '空仓' if sim['side'] is None else f"{ASSETS[sim['side']]}（本轮已买 {sim['count']}/5 笔）"
     action_map = {
-        'buy': lambda o: f"下一交易周买入{ASSETS[o['asset']]}第 {sim['count'] + 1} 笔",
+        'buy': lambda o: f"本周买入{ASSETS[o['asset']]}第 {sim['count'] + 1} 笔",
         'sell': lambda o: ('卖清剩余' if o['part'] == 1 else '卖出一半') + ASSETS[o['asset']],
     }
     if sim['orders']:

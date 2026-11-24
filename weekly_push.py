@@ -155,7 +155,7 @@ def fmt_money(value):
 
 
 def build_subject(sim, new_trades, new_orders):
-    """标题统一「极其重要」XXXX；持仓变化场景写进 XXXX。"""
+    """仅实际发生建仓/卖出/换仓时用「极其重要」XXXX；常规周报用普通标题。"""
     if new_trades:
         kinds = {t['kind'] for t in new_trades}
         buys = [t for t in new_trades if t['kind'] == 'buy']
@@ -173,14 +173,14 @@ def build_subject(sim, new_trades, new_orders):
             n = len(round_lots[-1]['lots']) if round_lots else 1
             topic = f"买入{ASSETS[asset]}第{n}笔"
         return f'「极其重要」{topic}'
-    # 尚无成交，但有下周待执行指令 —— 也属持仓变化预警
+    # 仅有待执行指令、尚无真实成交：普通标题，正文红色横幅提示
     if new_orders:
         order = new_orders[0]
         if order['kind'] == 'sell':
             act = '卖清' if order['part'] == 1 else '卖一半'
-            return f"「极其重要」准备{act}{ASSETS[order['asset']]}"
-        return f"「极其重要」准备买入{ASSETS[order['asset']]}"
-    return '「极其重要」红创比值周报：区间与推演'
+            return f"红创比值周报：准备{act}{ASSETS[order['asset']]}"
+        return f"红创比值周报：准备买入{ASSETS[order['asset']]}"
+    return '红创比值周报：区间与推演'
 
 
 def zone_text(ratio, bar):

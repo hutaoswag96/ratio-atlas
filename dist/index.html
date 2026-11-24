@@ -1,9 +1,9 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>比值手记 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-prices.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>红创比值 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-prices.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
 <header class="workspace-header">
   <div class="mast">
     <a class="brand" href="#top">
       <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 15 4-4 4 2 7-6M4 20h16M8 11v9m4-7v7m7-13v13"/></svg></span>
-      <span>比值手记</span>
+      <span>红创比值</span>
     </a>
     <nav aria-label="执行台导航">
       <a href="#top" aria-current="location"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg><span>本周判断</span></a>
@@ -16,7 +16,7 @@
   </div>
   <div class="workspace-bar"><div class="workspace-bar-inner"><a href="#top">我的投资工作台</a><span aria-hidden="true">/</span><strong id="active-section">本周判断</strong></div></div>
 </header>
-<main id="top" class="wrap"><div class="intro"><div><p class="ey"><span>中证红利 <code>000922</code></span> <i>/</i> <span>创业板指 <code>399006</code></span></p><h1>五笔轮动执行台</h1></div><div class="intro-side">
+<main id="top" class="wrap"><div class="intro"><div><p class="ey"><span>中证红利 <code>000922</code></span> <i>/</i> <span>创业板指 <code>399006</code></span></p><h1>红创比值 · 五笔轮动执行台</h1></div><div class="intro-side">
   <div class="data-dates">
     <a href="#data"><span>行情日收盘</span><strong id="daily-asof"></strong></a>
     <a href="#data"><span>买卖依据周收盘</span><strong id="asof"></strong></a>
@@ -125,4 +125,4 @@
 <details id="data" class="sheet"><summary>行情日期与周线补录</summary>
 <p id="daily-detail" class="daily-detail" role="status"></p>
 <p>日收盘行情来自腾讯财经，打开页面时尝试更新。首页和日线图都显示最新可用的共同收盘。顶部状态条标明当前判断依据的周线日期，以及这条指令适用的交易周；该周收盘后仍未补录，状态会改为「待补录」。执行单、观察期和 13 周均线使用完整交易周的共同收盘，按下方方式补录。</p><p>内置数据取自两只指数及其全收益指数的共同周收盘。补录每个已结束交易周的四个收盘点位，可在本机重新计算图表、执行单与回测。请按时间顺序录入，遇节假日选当周最后一个交易日。</p><form id="append"><div class="form"><label>交易周末日期<input type="date" required id="newDay"></label><label>红利 000922<input required type="number" min=".01" step="any" id="p0"></label><label>创业板 399006<input required type="number" min=".01" step="any" id="p1"></label><label>红利全收益 H00922<input required type="number" min=".01" step="any" id="p2"></label><label>创业板全收益 399606<input required type="number" min=".01" step="any" id="p3"></label></div><button class="button">保存本周数据</button> <button type="button" id="undo">撤回最后一次补录</button></form><p id="notice" role="status"></p></details>
-<footer>比值手记 <span>中证红利 / 创业板指 · 单边轮动</span></footer></main></body></html>
+<footer>红创比值 <span>中证红利 / 创业板指 · 单边轮动</span></footer></main></body></html>

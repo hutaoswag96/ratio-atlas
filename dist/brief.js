@@ -339,12 +339,22 @@ function visibleSection(){
  selectNav(current?'#'+current:'#top');
 }
 addEventListener('scroll',visibleSection,{passive:true});
-addEventListener('hashchange',()=>selectNav(location.hash));
-visibleSection();
-
-for (const link of document.querySelectorAll('a[href="#data"]')) {
- link.addEventListener('click', () => { $('data').open = true; });
+function openHashTarget(){
+ const id=location.hash.slice(1);
+ if(id==='data'||id==='funds'||id==='rules')$(id).open=true;
+ if(id.startsWith('fund-'))$('funds').open=true;
 }
+addEventListener('hashchange',()=>{selectNav(location.hash);openHashTarget();});
+visibleSection();
+openHashTarget();
+
+document.addEventListener('click',e=>{
+ const a=e.target.closest('a[href^="#"]');
+ if(!a)return;
+ const id=a.getAttribute('href').slice(1);
+ if(id==='data'||id==='funds'||id==='rules')$(id).open=true;
+ else if(id.startsWith('fund-'))$('funds').open=true;
+});
 
 const mobileLayout = matchMedia('(max-width: 700px)');
 function syncChartDatePanel() {

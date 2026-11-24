@@ -154,8 +154,15 @@ def fmt_money(value):
     return f'{value:,.0f}'
 
 
+def holding_text(sim):
+    """当前持仓状态的简短描述，用于常规周报标题。"""
+    if sim['side'] is None:
+        return '空仓'
+    return f"持有{ASSETS[sim['side']]}（已买 {sim['count']}/5 笔）"
+
+
 def build_subject(sim, new_trades, new_orders):
-    """仅实际发生建仓/卖出/换仓时用「极其重要」XXXX；常规周报用普通标题。"""
+    """仅实际发生建仓/卖出/换仓时用「极其重要」XXXX；常规周报标题显示当前持仓状态。"""
     if new_trades:
         kinds = {t['kind'] for t in new_trades}
         buys = [t for t in new_trades if t['kind'] == 'buy']
@@ -180,7 +187,7 @@ def build_subject(sim, new_trades, new_orders):
             act = '卖清' if order['part'] == 1 else '卖一半'
             return f"红创比值周报：准备{act}{ASSETS[order['asset']]}"
         return f"红创比值周报：准备买入{ASSETS[order['asset']]}"
-    return '红创比值周报：区间与推演'
+    return f"红创比值周报：{holding_text(sim)}"
 
 
 def zone_text(ratio, bar):

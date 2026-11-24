@@ -116,12 +116,12 @@
  <section id="projection" class="projection" aria-live="polite" aria-label="比值情景推演"></section>
 </section>
 <section class="sheet" id="history"><div class="heading"><div><p class="ey">从 1 万元起步 · 含分红再投入</p><h2>历史操作记录</h2></div></div><div id="stats"></div><p class="history-curve-link"><a href="#linked-performance" data-performance="all">查看完整策略的收益与回撤</a></p><div class="table-tools"><h3>模拟卖出记录</h3><label>资产 <select id="asset-filter"><option value="">全部资产</option><option value="0">中证红利</option><option value="1">创业板指</option></select></label></div><p class="meta">点成交日期可定位图上的卖点。</p><div id="sales" class="rows"></div><h3>各轮建仓与收益</h3><div id="cycles"></div><p class="meta">信号后下一共同交易周收盘成交，买卖单边各计 0.10%，现金零息。年化与期末市值以完整周线为准，日度回撤以已载入的收盘数据计算。历史模拟尚未计入基金管理费及额外滑点。</p></section>
-<section class="sheet" id="funds">
- <div class="heading"><div><p class="ey">可在基金销售平台搜索基金代码</p><h2>对应的场外指数基金</h2></div></div>
+<details class="sheet" id="funds">
+ <summary>对应的场外指数基金</summary>
  <div id="fund-list" class="fund-list"></div>
- <p class="meta">下方列出跟踪对应指数的场外 ETF 联接基金，包含基金代码与目标 ETF，供你在销售平台核对。具体申购状态以销售平台为准。</p>
-</section>
-<section class="sheet guide" id="rules"><div class="heading"><h2>交易规则</h2></div><ol class="rules"><li><b>每日看比值，周末看信号</b>日收盘低过下线关注红利，高过上线关注创业板，碰到线也算。交易观察期从有效的周收盘入区开始计算。</li><li><b>再等它相对转强</b>最近一次仍处于观察区起，含当周最多观察 13 周。红利要等比值高于近 13 周平均数；创业板要等比值低于平均数。先到另一端就改看另一边。</li><li><b>一轮的钱分五份</b>空仓确认后下周收盘买第一份。每笔成交满 28 天后的首个周收盘发出加仓信号，再下一周收盘买一份。同向无需重新触线。</li><li><b>换边时分两次卖</b>对侧确认后，下周收盘卖旧仓一半，再下一周收盘卖清，同时用新一轮资金的 20% 买另一边。</li></ol></section>
+ <p class="meta">可在基金销售平台搜索基金代码。下方列出跟踪对应指数的场外 ETF 联接基金，包含基金代码与目标 ETF，供你核对；具体申购状态以销售平台为准。</p>
+</details>
+<details class="sheet guide" id="rules"><summary>交易规则</summary><ol class="rules"><li><b>每日看比值，周末看信号</b>日收盘低过下线关注红利，高过上线关注创业板，碰到线也算。交易观察期从有效的周收盘入区开始计算。</li><li><b>再等它相对转强</b>最近一次仍处于观察区起，含当周最多观察 13 周。红利要等比值高于近 13 周平均数；创业板要等比值低于平均数。先到另一端就改看另一边。</li><li><b>一轮的钱分五份</b>空仓确认后下周收盘买第一份。每笔成交满 28 天后的首个周收盘发出加仓信号，再下一周收盘买一份。同向无需重新触线。</li><li><b>换边时分两次卖</b>对侧确认后，下周收盘卖旧仓一半，再下一周收盘卖清，同时用新一轮资金的 20% 买另一边。</li></ol></details>
 <details id="data" class="sheet"><summary>行情日期与周线补录</summary>
 <p id="daily-detail" class="daily-detail" role="status"></p>
 <p>日收盘行情来自腾讯财经，打开页面时尝试更新。首页和日线图都显示最新可用的共同收盘。顶部状态条标明当前判断依据的周线日期，以及这条指令适用的交易周；该周收盘后仍未补录，状态会改为「待补录」。执行单、观察期和 13 周均线使用完整交易周的共同收盘，按下方方式补录。</p><p>内置数据取自两只指数及其全收益指数的共同周收盘。补录每个已结束交易周的四个收盘点位，可在本机重新计算图表、执行单与回测。请按时间顺序录入，遇节假日选当周最后一个交易日。</p><form id="append"><div class="form"><label>交易周末日期<input type="date" required id="newDay"></label><label>红利 000922<input required type="number" min=".01" step="any" id="p0"></label><label>创业板 399006<input required type="number" min=".01" step="any" id="p1"></label><label>红利全收益 H00922<input required type="number" min=".01" step="any" id="p2"></label><label>创业板全收益 399606<input required type="number" min=".01" step="any" id="p3"></label></div><button class="button">保存本周数据</button> <button type="button" id="undo">撤回最后一次补录</button></form><p id="notice" role="status"></p></details>

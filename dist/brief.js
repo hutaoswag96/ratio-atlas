@@ -222,74 +222,61 @@ function history(){
  const dailyRisk=calculateDrawdowns(trendDaily.nav,trendDaily.dates);
  $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大日度回撤</span><strong class="lot-risk">'+pct(dailyRisk.depth)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div><p class="meta">日度回撤截至 '+trendDaily.dates.at(-1)+' · '+drawdownDates(dailyRisk)+'。</p>';
 
- const roundSales=model.rounds.filter(r=>r.sales.length).slice().reverse();
- const dateButton=i=>i===undefined?'待成交':'<button type="button" class="sale-date" data-week="'+i+'">'+rows[i][0]+'</button>';
- $('sales').innerHTML=roundSales.length?'<table><thead><tr><th>卖出旧仓</th><th>卖一半</th><th>卖清剩余</th></tr></thead><tbody>'+roundSales.map(r=>'<tr data-asset="'+r.asset+'"><td>'+ASSETS[r.asset]+'</td><td>'+dateButton(r.sales[0])+'</td><td>'+dateButton(r.sales[1])+'</td></tr>').join('')+'</tbody></table>':'尚无模拟卖出成交。';
- $('cycles').innerHTML=model.rounds.map((r,j)=>{
-  const lots=r.lots.map((l,slot)=>{
-   const {risk,useDaily}=lotHistory(r,l);
-   return '<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(l.ret)+'">'+pct(l.ret)+'</td>'+
-    '<td><button type="button" class="risk-button" data-risk-round="'+j+'" data-risk-lot="'+slot+
-    '" aria-expanded="false" aria-controls="history-lot-'+j+'">'+pct(risk.depth)+(useDaily?'':'（周线）')+'</button></td></tr>';
-  }).join('');
-  const status=r.end===undefined?'持有中，截至 '+rows[end][0]+' 按周收盘估值':'分批卖出 '+r.sales.map(i=>rows[i][0]).join('、');
-  return '<details class="round"><summary>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+' · '+rows[r.start][0].slice(0,7)+
-   '<span class="'+changeClass(r.ret)+'">'+pct(r.ret)+'</span></summary><p>'+status+'</p>'+
-   '<div class="rows"><table><tr><th>买入周</th><th>投入（元）</th><th>该笔周线收益</th><th>该笔最大回撤</th></tr>'+lots+'</table></div><div id="history-lot-'+j+'" class="history-lot-detail" hidden></div></details>';
- }).join('');
-
- installTableControls();
+  const orders=model.rounds.map((r,j)=>({r,j})).reverse();
+  const saleDate=(i,date)=>i===undefined?'—':'<button type="button" class="sale-date" data-week="'+i+'">'+date+'</button>';
+  $('orders').innerHTML=orders.length?orders.map(({r,j})=>{
+   const sold=r.end!==undefined;
+   const first=rows[r.start][0],lastBuy=rows[r.lots.at(-1).i][0];
+   const half=r.sales[0]!==undefined?rows[r.sales[0]][0]:null;
+   const clear=sold?rows[r.end][0]:null;
+   const lots=r.lots.map((l,slot)=>{
+    const {risk,useDaily}=lotHistory(r,l);
+    return '<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(l.ret)+'">'+pct(l.ret)+'</td>'+
+     '<td><button type="button" class="risk-button" data-risk-round="'+j+'" data-risk-lot="'+slot+
+     '" aria-expanded="false" aria-controls="history-lot-'+j+'">'+pct(risk.depth)+(useDaily?'':'（周线）')+'</button></td></tr>';
+   }).join('');
+   const timeline='<div class="order-timeline">'+
+    '<span><em>首笔买入</em><b>'+first+'</b></span>'+
+    '<span><em>最后一笔</em><b>'+lastBuy+'</b></span>'+
+    '<span><em>卖一半</em><b>'+saleDate(r.sales[0],half)+'</b></span>'+
+    '<span><em>卖清</em><b>'+saleDate(r.end,clear)+'</b></span></div>';
+   return '<details class="order" data-asset="'+r.asset+'"><summary>'+
+    '<span class="order-main"><b>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+'</b>'+
+    '<span class="order-state '+(sold?'done':'holding')+'">'+(sold?'已卖出':'持有中')+'</span>'+
+    '<em>'+first.slice(0,7)+(sold?' → '+clear.slice(0,7):' 起 · 按 '+rows[end][0]+' 估值')+'</em></span>'+
+    '<strong class="order-ret '+changeClass(r.ret)+'">'+(r.ret>0?'+':'')+pct(r.ret)+'</strong></summary>'+
+    '<div class="order-body">'+timeline+
+    '<div class="rows"><table><thead><tr><th>买入周</th><th>投入（元）</th><th>该笔收益</th><th>该笔最大回撤</th></tr></thead><tbody>'+lots+'</tbody></table></div>'+
+    '<div id="history-lot-'+j+'" class="history-lot-detail" hidden></div></div></details>';
+  }).join(''):'尚无模拟订单。';
+  filterSales();
 }
-$('cycles').onclick=e=>{
- const button=e.target.closest('button[data-risk-lot]');
- if(!button)return;
- const roundIndex=Number(button.dataset.riskRound), slot=Number(button.dataset.riskLot);
- const panel=$('history-lot-'+roundIndex), round=model.rounds[roundIndex], lot=round.lots[slot];
- const open=button.getAttribute('aria-expanded')!=='true';
- for(const other of button.closest('details').querySelectorAll('.risk-button'))other.setAttribute('aria-expanded','false');
- panel.hidden=!open;
- if(!open)return;
- button.setAttribute('aria-expanded','true');
- renderLotChart(panel,round,lot);
- panel.insertAdjacentHTML('afterbegin','<h4>第 '+(slot+1)+' 笔 · '+rows[lot.i][0]+'</h4>');
- panel.scrollIntoView({block:'nearest'});
-};
-function filterSales(){
- const filter=$('asset-filter').value;
- for(const row of $('sales').querySelectorAll('tr[data-asset]'))row.hidden=filter!==''&&row.dataset.asset!==filter;
-}
-function installTableControls(){
- for(const table of $('history').querySelectorAll('table')){
-  for(const th of table.querySelectorAll('th')){
-   const col=th.cellIndex,label=th.textContent,button=document.createElement('button');
-   button.className='sort';button.textContent=label;button.setAttribute('aria-label','按'+label+'排序');
-   th.replaceChildren(button);
-   button.onclick=()=>{
-    const ascending=th.getAttribute('aria-sort')!=='ascending';
-    for(const h of table.querySelectorAll('th'))h.removeAttribute('aria-sort');
-    th.setAttribute('aria-sort',ascending?'ascending':'descending');
-    const body=table.tBodies[0],records=[...body.rows].filter(row=>row.cells[0].tagName==='TD');
-    const key=row=>row.cells[col].textContent.trim();
-    const compare=(a,b)=>{
-     const x=key(a),y=key(b);
-     if(x==='待成交'||y==='待成交')return Number(x==='待成交')-Number(y==='待成交');
-     const n=Number(x.replace(/[,%]/g,'')),m=Number(y.replace(/[,%]/g,''));
-     return (ascending?1:-1)*(Number.isFinite(n)&&Number.isFinite(m)?n-m:x.localeCompare(y,'zh-CN'));
-    };
-    records.sort(compare).forEach(row=>body.append(row));
-   };
-  }
+$('orders').onclick=e=>{
+ const risk=e.target.closest('button[data-risk-lot]');
+ if(risk){
+  const roundIndex=Number(risk.dataset.riskRound), slot=Number(risk.dataset.riskLot);
+  const panel=$('history-lot-'+roundIndex), round=model.rounds[roundIndex], lot=round.lots[slot];
+  const open=risk.getAttribute('aria-expanded')!=='true';
+  for(const other of risk.closest('details').querySelectorAll('.risk-button'))other.setAttribute('aria-expanded','false');
+  panel.hidden=!open;
+  if(!open)return;
+  risk.setAttribute('aria-expanded','true');
+  renderLotChart(panel,round,lot);
+  panel.insertAdjacentHTML('afterbegin','<h4>第 '+(slot+1)+' 笔 · '+rows[lot.i][0]+'</h4>');
+  panel.scrollIntoView({block:'nearest'});
+  return;
  }
- filterSales();
-}
-$('asset-filter').onchange=filterSales;
-$('sales').onclick=e=>{
  const button=e.target.closest('button[data-week]');if(!button)return;
- for(const cell of $('sales').querySelectorAll('.sale-date'))cell.classList.toggle('selected',cell===button);
+ for(const cell of $('orders').querySelectorAll('.sale-date'))cell.classList.toggle('selected',cell===button);
  const i=+button.dataset.week;
  showTradeWeek(i);$('chart').scrollIntoView({block:'start'});
  $('cursor').focus({preventScroll:true});
 };
+function filterSales(){
+ const filter=$('asset-filter').value;
+ for(const card of $('orders').querySelectorAll('.order'))card.hidden=filter!==''&&card.dataset.asset!==filter;
+}
+$('asset-filter').onchange=filterSales;
 $('start-year').onchange=()=>{
  const year=$('start-year').value, preferred=year+$('start').value.slice(4,7);
  const available=rows.slice(START).filter(row=>row[0].startsWith(year));

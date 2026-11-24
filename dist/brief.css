@@ -140,6 +140,8 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
 .hold-trigger{margin-top:10px;color:var(--muted);font-size:14px}
 #plan-return:not(:empty){margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
 .fund-row{display:grid;grid-template-columns:1.3fr 1fr auto;gap:6px 16px;align-items:center;border-top:1px solid var(--line);padding:13px 4px}
+.fund-group>h3{margin:18px 0 4px;font-size:16px}
+.fund-row h4{margin:0;font-size:15px;font-weight:600}
 .fund-row p,.fund-code span{font-size:14px;color:var(--muted)}
 .fund-code{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 8px}
 .fund-code strong{font:650 20px var(--num)}

@@ -62,6 +62,7 @@ function showDailyClose() {
  } else context.textContent = '买卖按周收盘确认';
  $('daily-detail').textContent = date+' 收盘 · 中证红利 '+pointFormat.format(red)+' · 创业板指 '+pointFormat.format(growth)+
   ' · 比值 '+f(ratio)+(dailyError?'。行情源暂不可用，显示最近已获取的收盘。':'。');
+ if (typeof renderDataStatus === 'function') renderDataStatus();
 }
 
 async function dailySeries(symbol, first, last) {
@@ -97,6 +98,7 @@ async function refreshDailyClose() {
   liveDailyPrices = mergeDailyCloses(liveDailyPrices, common.filter(row=>row[0]>snapshotEnd));
   save('daily-price-series',liveDailyPrices);
   refreshTrendQuotes();
+  renderProjection();
   dailyError = false;
  } catch {
   dailyError = true;

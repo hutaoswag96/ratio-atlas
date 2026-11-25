@@ -489,17 +489,124 @@ function shadeSelection(first, last) {
  }
 }
 
+/* ---------- 触摸手势：双指缩放、单指左右平移 ---------- */
+const TOUCH_MIN_DAYS = 2;
+let touchGesture = null, rangeFrame = 0, rangePending = null;
+
+function queueTrendRange(first, last) {
+ rangePending = [first, last];
+ if (rangeFrame) return;
+ rangeFrame = requestAnimationFrame(() => {
+  rangeFrame = 0;
+  if (!rangePending) return;
+  const [a, b] = rangePending;
+  rangePending = null;
+  setTrendRange(a, b, { mark: keepBetween(markedDay, a, b) });
+ });
+}
+
+function touchStart(view, plot, e) {
+ if (!touchGesture || touchGesture.view !== view) {
+  touchGesture = { view, pts: new Map(), mode: 'pan', moved: false, vertical: false,
+   startX: e.clientX, startY: e.clientY, first: trendRange.first, last: trendRange.last };
+ }
+ const g = touchGesture;
+ g.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+ try { plot.setPointerCapture(e.pointerId); } catch {}
+ if (g.pts.size === 1) {
+  g.mode = 'pan';
+  g.first = trendRange.first;
+  g.last = trendRange.last;
+  g.startX = e.clientX;
+  g.startY = e.clientY;
+  g.moved = false;
+  g.vertical = false;
+ } else if (g.pts.size === 2) {
+  const [a, b] = [...g.pts.values()];
+  const p = view.geometry;
+  g.mode = 'pinch';
+  g.first = trendRange.first;
+  g.last = trendRange.last;
+  g.count = g.last - g.first + 1;
+  g.distance = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  const mid = (a.x + b.x) / 2 - plot.getBoundingClientRect().left;
+  g.fraction = keepBetween((mid - p.left) / Math.max(1, p.right - p.left), 0, 1);
+ }
+}
+
+function touchMove(view, plot, e) {
+ const g = touchGesture;
+ if (!g || g.view !== view || !g.pts.has(e.pointerId)) return false;
+ g.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+ const total = trendDates.length;
+
+ if (g.mode === 'pinch' && g.pts.size >= 2) {
+  if (e.cancelable) e.preventDefault();
+  const [a, b] = [...g.pts.values()];
+  const distance = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+  const count = keepBetween(Math.round(g.count * g.distance / distance), TOUCH_MIN_DAYS, total);
+  const anchor = g.first + g.fraction * (g.count - 1);
+  const first = keepBetween(Math.round(anchor - g.fraction * (count - 1)), 0, total - count);
+  g.moved = true;
+  queueTrendRange(first, first + count - 1);
+  return true;
+ }
+
+ if (g.mode === 'pan') {
+  const dx = e.clientX - g.startX, dy = e.clientY - g.startY;
+  if (!g.moved) {
+   // 纵向为主时交还给浏览器滚动页面，不拦截
+   if (g.vertical || (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(dx) * 1.4)) { g.vertical = true; return true; }
+   if (Math.abs(dx) < 6) return true;
+   g.moved = true;
+  }
+  if (e.cancelable) e.preventDefault();
+  const p = view.geometry;
+  const count = g.last - g.first + 1;
+  const pxPerDay = (p.right - p.left) / Math.max(1, count - 1);
+  const first = keepBetween(g.first + Math.round(-dx / pxPerDay), 0, total - count);
+  queueTrendRange(first, first + count - 1);
+  return true;
+ }
+ return true;
+}
+
+function touchEnd(view, e, cancelled) {
+ const g = touchGesture;
+
+ if (!g || g.view !== view) return false;
+ g.pts.delete(e.pointerId);
+ try { $(view.plot).releasePointerCapture(e.pointerId); } catch {}
+ if (g.pts.size === 1) {
+  const rest = [...g.pts.values()][0];
+  g.mode = 'pan';
+  g.first = trendRange.first;
+  g.last = trendRange.last;
+  g.startX = rest.x;
+  g.startY = rest.y;
+  g.moved = true;
+  g.vertical = false;
+  return true;
+ }
+ if (g.pts.size === 0) {
+  const tap = !cancelled && !g.moved && !g.vertical;
+  touchGesture = null;
+  if (tap) selectTrendDay(dayAtPointer(view, e));
+ }
+ return true;
+}
+
 function bindTrendPlot(view) {
  const plot = $(view.plot), tip = $(view.tip);
  plot.onpointerdown = e => {
+  if (e.pointerType === 'touch') { touchStart(view, plot, e); return; }
   if (e.button !== 0) return;
   const day = dayAtPointer(view, e);
-  if (e.pointerType === 'touch') return;
   dragSelection = { day, x: e.clientX, pointer: e.pointerId };
   plot.setPointerCapture(e.pointerId);
  };
  plot.onpointermove = e => {
-  if (e.pointerType === 'touch') return;
+  if (e.pointerType === 'touch') { touchMove(view, plot, e); return; }
   const day = dayAtPointer(view, e);
   hoverDay = day;
   updateTrendReadouts(day);
@@ -509,7 +616,7 @@ function bindTrendPlot(view) {
   } else showTrendTip(view, e, day);
  };
  plot.onpointerup = e => {
-  if (e.pointerType === 'touch') { selectTrendDay(dayAtPointer(view,e)); return; }
+  if (e.pointerType === 'touch') { touchEnd(view, e, false); return; }
   if (dragSelection?.pointer !== e.pointerId) return;
   const a = dragSelection.day, b = dayAtPointer(view, e);
   const zoom = Math.abs(e.clientX - dragSelection.x) > 7 && a !== b;
@@ -517,6 +624,11 @@ function bindTrendPlot(view) {
   shadeSelection(null);
   if (zoom) setTrendRange(Math.min(a,b), Math.max(a,b));
   else selectTrendDay(a);
+ };
+ plot.onpointercancel = e => {
+  if (e.pointerType === 'touch') { touchEnd(view, e, true); return; }
+  dragSelection = null;
+  shadeSelection(null);
  };
  plot.onlostpointercapture = () => { dragSelection = null; shadeSelection(null); };
  plot.onpointerleave = () => {
@@ -553,4 +665,8 @@ function setupTrendCharts() {
   bindTrendPlot(view);
   observer.observe($(view.plot));
  }
+ // iOS：阻止图表上的页面级双指缩放，保留我们自己的手势
+ document.addEventListener('gesturestart', e => {
+  if (e.target.closest?.('#plot, #index-plot')) e.preventDefault();
+ }, { passive: false });
 }

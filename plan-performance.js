@@ -59,6 +59,22 @@ function calculateDrawdowns(nav, dates, initial=nav[0]) {
  return {draws,depth,peak:dates[highAt],trough:dates[lowAt],recovery:dates[recovered]};
 }
 
+function lotFloat(observations,lot) {
+ const firstSale=lot.fills.length?rows[lot.fills[0].i][0]:null;
+ let depth=0,date=null;
+ let weekDepth=0,weekDate=null,weekCount=0;
+ for(const [day,close] of observations){
+  if(firstSale!==null&&day>firstSale)break;
+  const change=lot.qty*close/lot.cost-1;
+  if(change<depth){depth=change;date=day;}
+  if(weekCount<5){
+   if(change<weekDepth){weekDepth=change;weekDate=day;}
+   weekCount++;
+  }
+ }
+ return {depth,date,week:{depth:weekDepth,date:weekDate}};
+}
+
 function lotHistory(round,lot) {
  const cached=lotSeriesCache.get(lot);
  if(cached)return cached;
@@ -78,8 +94,9 @@ function lotHistory(round,lot) {
   return cash+remain*close;
  });
  const risk=calculateDrawdowns(nav,dates,lot.cost);
+ const float=lotFloat(observations,lot);
  const points=nav.map((value,i)=>({date:dates[i],gain:value/lot.cost-1,draw:risk.draws[i]}));
- const result={points,risk,useDaily,through:dates.at(-1)};
+ const result={points,risk,float,useDaily,through:dates.at(-1)};
  lotSeriesCache.set(lot,result);
  return result;
 }
@@ -99,11 +116,12 @@ function renderPlanLots(rounds) {
   const lotsHTML = round.lots.map((lot, slot) => {
    const id = String(lot.i);
    const gain = lot.ret * lot.cost;
-   const {risk,useDaily}=lotHistory(round,lot);
+   const {risk,useDaily,float}=lotHistory(round,lot);
    return `<details class="plan-lot" data-lot="${id}" ${open.has(id)?'open':''}>
     <summary><span>第 ${slot+1} 笔 <time>${rows[lot.i][0]}</time></span>
     <span class="lot-summary-metrics"><strong class="${changeClass(gain)}">${signedMoney(gain)} <small>${gain>0?'+':''}${pct(lot.ret)}</small></strong>
-    <small class="lot-risk">${useDaily?'最大回撤':'最大周线回撤'} <b>${pct(risk.depth)}</b></small></span></summary>
+    <small class="lot-risk">${useDaily?'最大回撤':'最大周线回撤'} <b>${pct(risk.depth)}</b></small>
+    <small class="lot-float">浮亏最深 <b>${pct(float.depth)}</b></small></span></summary>
     <div class="lot-detail"></div>
    </details>`;
   }).join('');
@@ -111,7 +129,7 @@ function renderPlanLots(rounds) {
  });
  const totalLots = rounds.reduce((sum,round)=>sum+round.lots.length,0);
  container.innerHTML = '<details class="plan-lot-list" '+(expanded?'open':'')+'><summary>逐笔收益与回撤 <span>'+
-  totalLots+' 笔</span></summary><p class="meta">每笔由买入后价值高点计算回撤，点开可查看曲线与峰谷日期。</p>'+
+  totalLots+' 笔</span></summary><p class="meta">浮亏以买入本金为基准，回撤以持有期最高点为基准；点开可查看曲线与峰谷日期。</p>'+
   roundsHTML.reverse().join('')+'</details>';
  const list = container.querySelector('.plan-lot-list');
  for (const round of rounds) for (const lot of round.lots) {
@@ -128,7 +146,7 @@ function renderPlanLots(rounds) {
 }
 
 function renderLotChart(panel, round, lot) {
- const {points:data,risk,useDaily,through}=lotHistory(round,lot);
+ const {points:data,risk,float,useDaily,through}=lotHistory(round,lot);
  const plots = [
   {key:'gain', label:'收益率', color:'var(--brand)'},
   {key:'draw', label:'回撤', color:'var(--amber)'}
@@ -145,10 +163,19 @@ function renderLotChart(panel, round, lot) {
   const label = value => (100*value).toFixed(Math.abs(value)<.1?1:0)+'%';
   for (const value of [...new Set([min,0,max])]) {
    const yy = y(value);
-   svg += `<path d="M${left} ${yy}H${right}" stroke="var(--grid)"/><text x="${left-6}" y="${yy+4}" text-anchor="end">${label(value)}</text>`;
+   const cost = value === 0 && plot.key === 'gain';
+   svg += `<path d="M${left} ${yy}H${right}" stroke="${cost?'var(--subtle)':'var(--grid)'}"${cost?' stroke-dasharray="3 3"':''}/><text x="${left-6}" y="${yy+4}" text-anchor="end">${label(value)}</text>`;
   }
   const d = data.map((point, j) => (j?'L':'M')+x(point)+' '+y(point[plot.key])).join(' ');
   svg += `<path d="${d}" fill="none" stroke="${plot.color}" stroke-width="1.7"/>`;
+  if (plot.key === 'gain' && float.date) {
+   const spot = data.find(point => point.date === float.date);
+   if (spot) {
+    const sx = x(spot), sy = y(spot.gain);
+    const anchor = sx < left + 46 ? 'start' : sx > right - 46 ? 'end' : 'middle';
+    svg += `<circle cx="${sx}" cy="${sy}" r="3.2" fill="var(--amber)"/><text x="${sx}" y="${sy+15}" text-anchor="${anchor}" fill="var(--amber)">最深 ${pct(float.depth)}</text>`;
+   }
+  }
   if (data.length === 1) svg += `<circle cx="${x(data[0])}" cy="${y(data[0][plot.key])}" r="3" fill="${plot.color}"/>`;
  }
  const tickCount = data.length === 1 ? 1 : width >= 340 && data.length > 2 ? 3 : 2;
@@ -160,8 +187,9 @@ function renderLotChart(panel, round, lot) {
 
  panel.innerHTML = `
   <p class="meta">投入 ¥${planMoney.format(lot.cost)} · ${round.end===undefined?'估值至':'卖清于'} ${through} · ${useDaily?'日度估值':'周线估值'}</p>
-  <p class="meta lot-depth">最大回撤 <strong>${pct(risk.depth)}</strong> · ${drawdownDates(risk)}</p>
-  <div class="lot-legends"><span>━ 收益率</span><span>━ 回撤</span></div>
+  <p class="meta lot-depth">高点回撤 <strong>${pct(risk.depth)}</strong> · ${drawdownDates(risk)}</p>
+  <p class="meta lot-float-line">最大浮亏 <strong>${pct(float.depth)}</strong>${float.date?' · '+float.date+' 最贴近本金':''} · 买入后 5 个交易日最深 <strong>${pct(float.week.depth)}</strong>${float.week.date?'（'+float.week.date+'）':''}</p>
+  <div class="lot-legends"><span>━ 收益率</span><span>━ 回撤</span><span>┈ 成本线</span></div>
   <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="该笔买入后的收益率及回撤曲线">
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
   </svg></div>

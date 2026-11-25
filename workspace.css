@@ -433,3 +433,18 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   .swap-track { grid-template-columns: minmax(0, 1fr); }
   .swap-track li { grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 2px 10px; padding: 8px 10px; }
 }
+
+/* 逐笔浮亏（相对买入本金） */
+.lot-float-cell,.lot-float b,.lot-float-line strong { color: var(--amber); }
+.plan-lot summary .lot-float { font-size: 13px; }
+.float-summary { margin-top: 8px; padding: 10px 12px; border-left: 2px solid var(--amber); background: var(--layer); line-height: 1.7; }
+.float-summary b { color: var(--ink); font-weight: 620; }
+.float-summary strong { color: var(--amber); font-variant-numeric: tabular-nums; }
+@media (max-width: 700px) {
+  .rows td, .rows th { padding: 7px 6px; font-size: 13px; }
+  .risk-button { font-size: 13px; }
+}
+@media (max-width: 700px) {
+  .rows .th-extra { display: none; }
+  .rows td, .rows th { padding: 7px 4px; font-size: 12.5px; }
+}

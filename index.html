@@ -56,7 +56,7 @@
     <form id="chart-dates" aria-label="自选起止日期"><label>起始 <input type="date" id="chart-from" required></label><label>结束 <input type="date" id="chart-to" required></label><button>应用</button></form>
   </details>
 </div>
-<div class="range-meta"><p id="chart-range-status" class="chart-range-status" role="status"></p><span>在图上拖选日期范围可放大</span></div>
+<div class="range-meta"><p id="chart-range-status" class="chart-range-status" role="status"></p><span class="hint-mouse">在图上拖选日期范围可放大</span><span class="hint-touch">双指缩放 · 单指拖动 · 轻点选日</span></div>
 <div class="legend"><span class="ratio-key">━ 日收盘比值</span><span class="ratio-key">◇ 所选交易日</span><span class="red">● 买红利</span><span class="blue">● 买创业板</span><span class="sell-key">▽ 卖一半</span><span class="sell-key">▼ 卖清</span><span>┄ 年度观察线</span></div><div class="plot-frame"><svg id="plot" role="img" aria-label="中证红利除以创业板指的日收盘比值、年度观察线及周线模拟买卖点"></svg><div id="ratio-selection" class="chart-selection" hidden></div><output id="plot-tip" aria-hidden="true" hidden></output></div><div class="scrub"><label for="cursor">查看交易日</label><input type="range" id="cursor"><output id="readout" for="cursor"></output></div><ul id="trade-readout" hidden aria-label="所选交易日的模拟成交"></ul><section class="index-panel" aria-labelledby="index-heading">
   <div class="index-title"><h3 id="index-heading">两只指数走势</h3><p>同一时间窗口，首个交易日收盘均设为 100</p></div>
   <div class="legend"><span class="red">━ 中证红利 000922</span><span class="blue">┄ 创业板指 399006</span></div>

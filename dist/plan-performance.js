@@ -122,16 +122,16 @@ function renderPlanLots(simulation, start) {
     <summary><span>第 ${slot+1} 笔 <time>${rows[lot.i][0]}</time></span>
     <span class="lot-summary-metrics"><strong class="${changeClass(gain)}">${signedMoney(gain)} <small>${gain>0?'+':''}${pct(lot.ret)}</small></strong>
     <small class="lot-risk">${useDaily?'最大回撤':'最大周线回撤'} <b>${pct(risk.depth)}</b></small>
-    <small class="lot-float">浮亏最深 <b>${pct(float.depth)}</b></small></span></summary>
+    <small class="lot-float">最大浮亏 <b>${pct(float.depth)}</b></small></span></summary>
     <div class="lot-detail"></div>
    </details>`;
   }).join('');
   const rh = roundHistory(simulation, start, index);
-  return `<section class="lot-round"><h4>第 ${index+1} 轮 · ${ASSETS[round.asset]}<span class="lot-round-risk">账户回撤 <b>${pct(rh.risk.depth)}</b> · 浮亏 <b>${pct(rh.float.depth)}</b></span></h4>${lotsHTML}</section>`;
+  return `<section class="lot-round"><h4>第 ${index+1} 轮 · ${ASSETS[round.asset]}<span class="lot-round-risk">最大回撤 <b>${pct(rh.risk.depth)}</b> · 最大浮亏 <b>${pct(rh.float.depth)}</b></span></h4>${lotsHTML}</section>`;
  });
  const totalLots = rounds.reduce((sum,round)=>sum+round.lots.length,0);
  container.innerHTML = '<details class="plan-lot-list" '+(expanded?'open':'')+'><summary>逐笔收益与回撤 <span>'+
-  totalLots+' 笔</span></summary><p class="meta">浮亏以买入本金为基准，回撤以持有期最高点为基准；点开可查看曲线与峰谷日期。</p>'+
+  totalLots+' 笔</span></summary><p class="meta">最大浮亏以买入本金为基准，最大回撤以持有期最高点为基准；点开可查看曲线与峰谷日期。</p>'+
   roundsHTML.reverse().join('')+'</details>';
  const list = container.querySelector('.plan-lot-list');
  for (const round of rounds) for (const lot of round.lots) {
@@ -175,7 +175,7 @@ function renderLotChart(panel, round, lot) {
    if (spot) {
     const sx = x(spot), sy = y(spot.gain);
     const anchor = sx < left + 46 ? 'start' : sx > right - 46 ? 'end' : 'middle';
-    svg += `<circle cx="${sx}" cy="${sy}" r="3.2" fill="var(--amber)"/><text x="${sx}" y="${sy+15}" text-anchor="${anchor}" fill="var(--amber)">最深 ${pct(float.depth)}</text>`;
+    svg += `<circle cx="${sx}" cy="${sy}" r="3.2" fill="var(--amber)"/><text x="${sx}" y="${sy+15}" text-anchor="${anchor}" fill="var(--amber)">最大 ${pct(float.depth)}</text>`;
    }
   }
   if (data.length === 1) svg += `<circle cx="${x(data[0])}" cy="${y(data[0][plot.key])}" r="3" fill="${plot.color}"/>`;
@@ -190,7 +190,7 @@ function renderLotChart(panel, round, lot) {
  panel.innerHTML = `
   <p class="meta">投入 ¥${planMoney.format(lot.cost)} · ${round.end===undefined?'估值至':'卖清于'} ${through} · ${useDaily?'日度估值':'周线估值'}</p>
   <p class="meta lot-depth">高点回撤 <strong>${pct(risk.depth)}</strong> · ${drawdownDates(risk)}</p>
-  <p class="meta lot-float-line">最大浮亏 <strong>${pct(float.depth)}</strong>${float.date?' · '+float.date+' 最贴近本金':''} · 买入后 5 个交易日最深 <strong>${pct(float.week.depth)}</strong>${float.week.date?'（'+float.week.date+'）':''}</p>
+  <p class="meta lot-float-line">最大浮亏 <strong>${pct(float.depth)}</strong>${float.date?' · '+float.date+' 最贴近本金':''} · 买入后 5 个交易日最大浮亏 <strong>${pct(float.week.depth)}</strong>${float.week.date?'（'+float.week.date+'）':''}</p>
   <div class="lot-legends"><span>━ 收益率</span><span>━ 回撤</span><span>┈ 成本线</span></div>
   <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="该笔买入后的收益率及回撤曲线">
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
@@ -225,7 +225,7 @@ function renderRoundChart(panel, sim, base, index) {
    if (spot) {
     const sx = x(spot), sy = y(spot.gain);
     const anchor = sx < left + 52 ? 'start' : sx > right - 52 ? 'end' : 'middle';
-    svg += `<circle cx="${sx}" cy="${sy}" r="3.2" fill="var(--amber)"/><text x="${sx}" y="${sy+15}" text-anchor="${anchor}" fill="var(--amber)">最深 ${pct(float.depth)}</text>`;
+    svg += `<circle cx="${sx}" cy="${sy}" r="3.2" fill="var(--amber)"/><text x="${sx}" y="${sy+15}" text-anchor="${anchor}" fill="var(--amber)">最大 ${pct(float.depth)}</text>`;
    }
   }
  }
@@ -238,7 +238,7 @@ function renderRoundChart(panel, sim, base, index) {
  panel.innerHTML = `
   <p class="meta">本轮投入 ¥${planMoney.format(invested)} · 起步账户 ¥${planMoney.format(startValue)} · ${useDaily?'日度估值':'周线估值'} · ${sim.rounds[index].end===undefined?'截至 '+through:'卖清于 '+through}</p>
   <p class="meta lot-depth">账户最大回撤 <strong>${pct(risk.depth)}</strong> · ${drawdownDates(risk)}</p>
-  <p class="meta lot-float-line">最深浮亏 <strong>${pct(float.depth)}</strong>${float.date?' · '+float.date+' 账户最低':''} · 相对本轮起步账户</p>
+  <p class="meta lot-float-line">最大浮亏 <strong>${pct(float.depth)}</strong>${float.date?' · '+float.date+' 账户最低':''} · 相对本轮起步账户</p>
   <div class="lot-legends"><span>━ 账户收益</span><span>━ 账户回撤</span><span>┈ 起步线</span></div>
   <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="本轮账户收益与回撤曲线">
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>

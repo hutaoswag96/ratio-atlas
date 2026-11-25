@@ -632,6 +632,7 @@ function bindTrendPlot(view) {
  };
  plot.onlostpointercapture = () => { dragSelection = null; shadeSelection(null); };
  plot.onpointerleave = () => {
+  if (touchGesture?.view === view) return;
   tip.hidden = true;
   hoverDay = null;
   updateTrendReadouts(markedDay);

@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>红创比值 · 五笔轮动执行台</title><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-prices.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>红创比值 · 轮动执行台</title><link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="apple-touch-icon" href="favicon.png"><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-prices.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
 <header class="workspace-header">
   <div class="mast">
     <a class="brand" href="#top">
@@ -16,7 +16,7 @@
   </div>
   <div class="workspace-bar"><div class="workspace-bar-inner"><a href="#top">我的投资工作台</a><span aria-hidden="true">/</span><strong id="active-section">本周判断</strong></div></div>
 </header>
-<main id="top" class="wrap"><div class="intro"><div><p class="ey"><span>中证红利 <code>000922</code></span> <i>/</i> <span>创业板指 <code>399006</code></span></p><h1>红创比值 · 五笔轮动执行台</h1></div><div class="intro-side">
+<main id="top" class="wrap"><div class="intro"><div><p class="ey"><span>中证红利 <code>000922</code></span> <i>/</i> <span>创业板指 <code>399006</code></span></p><h1>红创比值 · 轮动执行台</h1></div><div class="intro-side">
   <div class="data-dates">
     <a href="#data"><span>行情日收盘</span><strong id="daily-asof"></strong></a>
     <a href="#data"><span>买卖依据周收盘</span><strong id="asof"></strong></a>
@@ -80,7 +80,7 @@
 </section>
 <details><summary>为什么观察线会移动？</summary><p>每年年初，把 2011 年起到上年底的每周比值从小到大排列，取 20% 和 80% 两处作为观察线，全年固定。回测首年使用启动前 156 条周线。日收盘比值用于观察，周收盘入区并满足确认条件后，按执行单分笔操作。圆点和倒三角是周线策略的模拟买入和卖出。选中卖清并换仓的成交日，下方会分行显示先卖后买。</p></details></section>
 <section class="sheet" id="plan">
- <div class="heading"><h2>我的五笔执行单</h2><a class="plan-history-link" href="#linked-performance" data-performance="full">收益与回撤</a></div>
+ <div class="heading"><h2>本轮执行单</h2><a class="plan-history-link" href="#linked-performance" data-performance="full">收益与回撤</a></div>
  <div id="planBody" aria-live="polite"></div>
  <div id="plan-evidence" class="evidence-block" aria-live="polite"></div>
  <details id="plan-settings">
@@ -115,7 +115,7 @@
  <div id="plan-return"></div><div id="plan-lots"></div>
  <section id="projection" class="projection" aria-live="polite" aria-label="比值情景推演"></section>
 </section>
-<section class="sheet" id="history"><div class="heading"><div><p class="ey">从 1 万元起步 · 含分红再投入</p><h2>历史操作记录</h2></div></div><div id="stats"></div><p class="history-curve-link"><a href="#linked-performance" data-performance="all">查看完整策略的收益与回撤</a></p><div class="table-tools"><p class="meta">每轮订单含买入与卖出，按时间从近到远</p><label>资产 <select id="asset-filter"><option value="">全部资产</option><option value="0">中证红利</option><option value="1">创业板指</option></select></label></div><div id="orders"></div><p class="meta">信号后下一共同交易周收盘成交，买卖单边各计 0.10%，现金零息。年化与期末市值以完整周线为准，日度回撤以已载入的收盘数据计算。历史模拟尚未计入基金管理费及额外滑点。</p></section>
+<section class="sheet" id="history"><div class="heading"><div><p class="ey">从 1 万元起步 · 含分红再投入</p><h2>历史操作记录</h2></div></div><div id="stats"></div><p class="history-curve-link"><a href="#linked-performance" data-performance="all">查看完整策略的收益与回撤</a></p><div class="table-tools"><p class="meta">每轮订单含买入与卖出，按时间从近到远</p><label>资产 <select id="asset-filter"><option value="">全部资产</option><option value="0">中证红利</option><option value="1">创业板指</option></select></label></div><div id="orders"></div><p class="meta float-summary" id="float-summary"></p><p class="meta">信号后下一共同交易周收盘成交，买卖单边各计 0.10%，现金零息。年化与期末市值以完整周线为准，日度回撤以已载入的收盘数据计算。历史模拟尚未计入基金管理费及额外滑点。</p></section>
 <details class="sheet" id="funds">
  <summary>对应的场外指数基金</summary>
  <div id="fund-list" class="fund-list"></div>

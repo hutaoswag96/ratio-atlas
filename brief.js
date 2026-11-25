@@ -241,17 +241,31 @@ function history(){
     '<span><em>最后一笔</em><b>'+lastBuy+'</b></span>'+
     '<span><em>卖一半</em><b>'+saleDate(r.sales[0],half)+'</b></span>'+
     '<span><em>卖清</em><b>'+saleDate(r.end,clear)+'</b></span></div>';
-   return '<details class="order" data-asset="'+r.asset+'"><summary>'+
+   const rh=roundHistory(model,START,j);
+   return '<details class="order" data-asset="'+r.asset+'" data-round="'+j+'"><summary>'+
     '<span class="order-main"><b>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+'</b>'+
     '<span class="order-state '+(sold?'done':'holding')+'">'+(sold?'已卖出':'持有中')+'</span>'+
-    '<em>'+first.slice(0,7)+(sold?' → '+clear.slice(0,7):' 起 · 按 '+rows[end][0]+' 估值')+'</em></span>'+
+    '<em>'+first.slice(0,7)+(sold?' → '+clear.slice(0,7):' 起 · 按 '+rows[end][0]+' 估值')+'</em>'+
+    '<em class="order-risk">账户回撤 <b>'+pct(rh.risk.depth)+'</b> · 最深浮亏 <b>'+pct(rh.float.depth)+'</b></em></span>'+
     '<strong class="order-ret '+changeClass(r.ret)+'">'+(r.ret>0?'+':'')+pct(r.ret)+'</strong></summary>'+
-    '<div class="order-body">'+timeline+
+    '<div class="order-body">'+
+    '<div class="round-chart" data-round="'+j+'"></div>'+timeline+
     '<div class="rows"><table><thead><tr><th>买入周</th><th>投入<span class="th-extra">（元）</span></th><th><span class="th-extra">该笔</span>收益</th><th title="买入后持仓市值相对买入本金的最大跌幅，与高点无关"><span class="th-extra">最大</span>浮亏</th><th><span class="th-extra">高点</span>回撤</th></tr></thead><tbody>'+lots+'</tbody></table></div>'+
     '<div id="history-lot-'+j+'" class="history-lot-detail" hidden></div></div></details>';
   }).join(''):'尚无模拟订单。';
   filterSales();
   floatSummary();
+  roundCharts();
+}
+function roundCharts(){
+ for(const card of $('orders').querySelectorAll('.order')){
+  card.addEventListener('toggle',()=>{
+   if(!card.open)return;
+   const box=card.querySelector('.round-chart');
+   if(!box||box.childElementCount)return;
+   renderRoundChart(box,model,START,Number(card.dataset.round));
+  });
+ }
 }
 function floatSummary(){
  const box=$('float-summary');if(!box)return;
@@ -260,10 +274,15 @@ function floatSummary(){
  if(!every.length){box.textContent='';return;}
  const worst=every.reduce((a,b)=>b.h.float.depth<a.h.float.depth?b:a);
  const week=every.reduce((a,b)=>b.h.float.week.depth<a.h.float.week.depth?b:a);
+ const rounds=model.rounds.map((r,j)=>({h:roundHistory(model,START,j),j}));
+ const worstRound=rounds.reduce((a,b)=>b.h.risk.depth<a.h.risk.depth?b:a);
+ const worstRoundFloat=rounds.reduce((a,b)=>b.h.float.depth<a.h.float.depth?b:a);
  const label=item=>'第 '+(item.j+1)+' 轮第 '+(item.s+1)+' 笔'+(item.h.float.date?' · '+item.h.float.date:'');
  box.innerHTML='<b>两套风险口径</b>：浮亏以买入本金为基准，回撤以持有期最高点为基准——先涨 100% 再跌 20%，浮亏仍是 0，回撤才是 −20%。'+
-  '共 '+every.length+' 笔，浮亏最深 <strong>'+pct(worst.h.float.depth)+'</strong>（'+label(worst)+'）；'+
-  '买入后 5 个交易日最深 <strong>'+pct(week.h.float.week.depth)+'</strong>（第 '+(week.j+1)+' 轮第 '+(week.s+1)+' 笔）。';
+  '逐笔 '+every.length+' 笔，浮亏最深 <strong>'+pct(worst.h.float.depth)+'</strong>（'+label(worst)+'）；'+
+  '买入后 5 个交易日最深 <strong>'+pct(week.h.float.week.depth)+'</strong>（第 '+(week.j+1)+' 轮第 '+(week.s+1)+' 笔）。'+
+  '<br>按轮看账户：最大回撤最深 <strong>'+pct(worstRound.h.risk.depth)+'</strong>（第 '+(worstRound.j+1)+' 轮，'+worstRound.h.risk.peak+' 高点 → '+worstRound.h.risk.trough+' 谷底）；'+
+  '最深浮亏 <strong>'+pct(worstRoundFloat.h.float.depth)+'</strong>（第 '+(worstRoundFloat.j+1)+' 轮，'+worstRoundFloat.h.float.date+' 账户最低）。';
 }
 $('orders').onclick=e=>{
  const risk=e.target.closest('button[data-risk-lot]');

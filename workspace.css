@@ -448,3 +448,12 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   .rows .th-extra { display: none; }
   .rows td, .rows th { padding: 7px 4px; font-size: 12.5px; }
 }
+
+/* 轮级账户回撤与浮亏 */
+.order-main em.order-risk { color: var(--muted); }
+.order-risk b { color: var(--amber); font-weight: 600; }
+.round-chart { margin-bottom: 12px; }
+.round-chart svg { display: block; width: 100%; min-width: 218px; max-height: 200px; }
+.lot-round h4 { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
+.lot-round-risk { font-size: 13px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lot-round-risk b { color: var(--amber); font-weight: 600; }

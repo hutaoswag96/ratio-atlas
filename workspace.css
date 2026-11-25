@@ -445,6 +445,7 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   .risk-button { font-size: 13px; }
 }
 @media (max-width: 700px) {
+  .rows table { min-width: 0; }
   .rows .th-extra { display: none; }
   .rows td, .rows th { padding: 7px 4px; font-size: 12.5px; }
 }
@@ -501,3 +502,6 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 .call .projection .projection-how[open] summary::before { content: "▾ "; }
 .call .projection .projection-how p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
 @media (min-width: 901px) { .hero .quote { align-content: center; } }
+@media (max-width: 380px) {
+  .rows td, .rows th { padding: 6px 2px; font-size: 11px; }
+}

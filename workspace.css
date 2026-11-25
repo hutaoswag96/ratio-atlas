@@ -457,3 +457,47 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 .lot-round h4 { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
 .lot-round-risk { font-size: 13px; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 .lot-round-risk b { color: var(--amber); font-weight: 600; }
+
+/* 情景推演移入本周判断卡片 */
+.call .projection {
+  justify-self: stretch;
+  width: 100%;
+  margin: 4px 0 2px;
+  padding: 11px 13px;
+  border-radius: 9px;
+  background: var(--surface);
+}
+.call .projection-head h3 { font-size: 14px; letter-spacing: .01em; }
+.call .projection-head span { font-size: 11.5px; }
+.call .projection > p { margin: 5px 0 7px; font-size: 13px; line-height: 1.55; }
+.call .projection-values {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-bottom: 7px;
+}
+.call .projection-values > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 5px 0;
+  border-top: 1px dashed var(--line);
+}
+.call .projection-values > div:first-child { border-top: 0; padding-top: 1px; }
+.call .projection-values span { font-size: 12.5px; }
+.call .projection-values strong { font-size: 13.5px; }
+.call .projection .projection-note { font-size: 12px; line-height: 1.6; }
+.call .projection .projection-how { margin-top: 2px; }
+.call .projection .projection-how summary {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 3px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.call .projection .projection-how summary::-webkit-details-marker { display: none; }
+.call .projection .projection-how summary::before { content: "▸ "; }
+.call .projection .projection-how[open] summary::before { content: "▾ "; }
+.call .projection .projection-how p { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+@media (min-width: 901px) { .hero .quote { align-content: center; } }

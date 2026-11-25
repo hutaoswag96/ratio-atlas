@@ -152,8 +152,8 @@ function renderProjection(){
   '<div class="projection-values"><div><span>到红利观察线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`比值下降 ${moveText(lowerDistance)}`)+'</strong></div>'+
   '<div><span>到创业板观察线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`比值上升 ${moveText(upperDistance)}`)+'</strong></div>'+
   '<div><span>候选换仓的粗略时间</span><strong>'+daysText+' · '+weeksText+'</strong></div></div>'+
-  '<p class="projection-note">'+confirmationText+'。粗略时间按近 60 个交易日比值平均绝对波动折算，假设波动延续；观察线按当前年度固定，实际路径可能更快、更慢，也可能始终不到。'+
-  '日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p>';
+  '<p class="projection-note">'+confirmationText+'。</p>'+
+  '<details class="projection-how"><summary>估算口径</summary><p>粗略时间按近 60 个交易日比值平均绝对波动折算，假设波动延续；观察线按当前年度固定，实际路径可能更快、更慢，也可能始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p></details>';
 }
 function actualPlan(start,capital){
  const raw=$('holding').value,asset=raw===''?null:Number(raw),filled=asset===null?0:Number($('filled').value);

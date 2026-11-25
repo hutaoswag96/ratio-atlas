@@ -37,7 +37,7 @@ function renderPlanPerformance(simulation, start, capital) {
   $('plan-return').scrollIntoView({block:'start'});
  };
  setPlanPerformanceScope(daily?{...daily,start,capital}:null);
- renderPlanLots(simulation.rounds);
+ renderPlanLots(simulation, start);
 }
 
 function weeklyValuationCutoff(day) {
@@ -107,7 +107,8 @@ function drawdownDates(risk) {
   (risk.recovery?' · '+risk.recovery+' 收复前高':' · 区间结束时尚未收复前高');
 }
 
-function renderPlanLots(rounds) {
+function renderPlanLots(simulation, start) {
+ const rounds = simulation.rounds;
  const container = $('plan-lots');
  if (!rounds.length) { container.replaceChildren(); return; }
  const expanded = container.querySelector('.plan-lot-list')?.open ?? !matchMedia('(max-width: 700px)').matches;
@@ -125,7 +126,8 @@ function renderPlanLots(rounds) {
     <div class="lot-detail"></div>
    </details>`;
   }).join('');
-  return `<section class="lot-round"><h4>第 ${index+1} 轮 · ${ASSETS[round.asset]}</h4>${lotsHTML}</section>`;
+  const rh = roundHistory(simulation, start, index);
+  return `<section class="lot-round"><h4>第 ${index+1} 轮 · ${ASSETS[round.asset]}<span class="lot-round-risk">账户回撤 <b>${pct(rh.risk.depth)}</b> · 浮亏 <b>${pct(rh.float.depth)}</b></span></h4>${lotsHTML}</section>`;
  });
  const totalLots = rounds.reduce((sum,round)=>sum+round.lots.length,0);
  container.innerHTML = '<details class="plan-lot-list" '+(expanded?'open':'')+'><summary>逐笔收益与回撤 <span>'+
@@ -194,6 +196,90 @@ function renderLotChart(panel, round, lot) {
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
   </svg></div>
   <p class="meta">部分卖出后，已回收现金与剩余持仓一起计入该笔收益。</p>`;
+}
+
+function renderRoundChart(panel, sim, base, index) {
+ const {points, risk, float, invested, useDaily, through, startValue} = roundHistory(sim, base, index);
+ const plots = [
+  {key:'gain', label:'账户收益', color:'var(--brand)'},
+  {key:'draw', label:'账户回撤', color:'var(--amber)'}
+ ];
+ const width = Math.max(218, panel.clientWidth - 16), height = 184, left = 43, right = width-9;
+ const duration = elapsed(through, points[0].date);
+ const x = point => duration ? left + (right-left)*elapsed(point.date, points[0].date)/duration : (left+right)/2;
+ let svg = '';
+ for (const [section, plot] of plots.entries()) {
+  const top = 13 + 79 * section, bottom = top + 62;
+  const values = points.map(point => point[plot.key]);
+  const min = Math.min(-.005, ...values), max = Math.max(0, ...values);
+  const span = max - min, y = value => bottom - (bottom-top)*(value-min)/span;
+  const label = value => (100*value).toFixed(Math.abs(value)<.1?1:0)+'%';
+  for (const value of [...new Set([min,0,max])]) {
+   const yy = y(value);
+   const base0 = value === 0 && plot.key === 'gain';
+   svg += `<path d="M${left} ${yy}H${right}" stroke="${base0?'var(--subtle)':'var(--grid)'}"${base0?' stroke-dasharray="3 3"':''}/><text x="${left-6}" y="${yy+4}" text-anchor="end">${label(value)}</text>`;
+  }
+  svg += `<path d="${points.map((point, j) => (j?'L':'M')+x(point)+' '+y(point[plot.key])).join(' ')}" fill="none" stroke="${plot.color}" stroke-width="1.7"/>`;
+  if (plot.key === 'gain' && float.date) {
+   const spot = points.find(point => point.date === float.date);
+   if (spot) {
+    const sx = x(spot), sy = y(spot.gain);
+    const anchor = sx < left + 52 ? 'start' : sx > right - 52 ? 'end' : 'middle';
+    svg += `<circle cx="${sx}" cy="${sy}" r="3.2" fill="var(--amber)"/><text x="${sx}" y="${sy+15}" text-anchor="${anchor}" fill="var(--amber)">最深 ${pct(float.depth)}</text>`;
+   }
+  }
+ }
+ const tickCount = points.length === 1 ? 1 : width >= 340 && points.length > 2 ? 3 : 2;
+ for (let j = 0; j < tickCount; j++) {
+  const point = points[tickCount===1?0:Math.round(j*(points.length-1)/(tickCount-1))];
+  const align = tickCount===1?'middle':j===0?'start':j===tickCount-1?'end':'middle';
+  svg += `<text x="${x(point)}" y="${height-3}" text-anchor="${align}">${point.date}</text>`;
+ }
+ panel.innerHTML = `
+  <p class="meta">本轮投入 ¥${planMoney.format(invested)} · 起步账户 ¥${planMoney.format(startValue)} · ${useDaily?'日度估值':'周线估值'} · ${sim.rounds[index].end===undefined?'截至 '+through:'卖清于 '+through}</p>
+  <p class="meta lot-depth">账户最大回撤 <strong>${pct(risk.depth)}</strong> · ${drawdownDates(risk)}</p>
+  <p class="meta lot-float-line">最深浮亏 <strong>${pct(float.depth)}</strong>${float.date?' · '+float.date+' 账户最低':''} · 相对本轮起步账户</p>
+  <div class="lot-legends"><span>━ 账户收益</span><span>━ 账户回撤</span><span>┈ 起步线</span></div>
+  <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="本轮账户收益与回撤曲线">
+   <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
+  </svg></div>
+  <p class="meta">已卖出的部分按成交价转为现金，仍计入账户。</p>`;
+}
+
+const roundSeriesCache = new WeakMap();
+
+function roundHistory(sim, base, index) {
+ let map = roundSeriesCache.get(sim);
+ if (!map) { map = new Map(); roundSeriesCache.set(sim, map); }
+ if (map.has(index)) return map.get(index);
+ const round = sim.rounds[index], first = round.start, last = round.end ?? end;
+ const useDaily = dailyTotalReturns.at(-1)[0] >= rows[last][0];
+ const cutoff = weeklyValuationCutoff(rows[last][0]);
+ const dates = [], nav = [];
+ if (useDaily) {
+  let week = first;
+  for (const [date, red, growth] of dailyTotalReturns) {
+   if (date < rows[first][0]) continue;
+   if (round.end === undefined ? Date.parse(date) >= cutoff : date > rows[last][0]) break;
+   while (week < last && rows[week+1][0] <= date) week++;
+   const {cash, side, units} = sim.positions[week - base];
+   dates.push(date);
+   nav.push(cash + (side === null ? 0 : units * (side === 0 ? red : growth)));
+  }
+ } else {
+  for (let i = first; i <= last; i++) { dates.push(rows[i][0]); nav.push(sim.nav[i - base]); }
+ }
+ const risk = calculateDrawdowns(nav, dates, nav[0]);
+ let depth = 0, date = null;
+ nav.forEach((value, i) => {
+  const change = value / nav[0] - 1;
+  if (change < depth) { depth = change; date = dates[i]; }
+ });
+ const points = nav.map((value, i) => ({date: dates[i], gain: value / nav[0] - 1, draw: risk.draws[i]}));
+ const invested = round.lots.reduce((sum, lot) => sum + lot.cost, 0);
+ const result = {points, risk, float: {depth, date}, invested, startValue: nav[0], useDaily, through: dates.at(-1)};
+ map.set(index, result);
+ return result;
 }
 
 function strategyDailySeries(weeks, daily, simulation, start) {

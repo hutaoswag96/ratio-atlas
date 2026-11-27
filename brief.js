@@ -217,9 +217,11 @@ function mode(){
 }
 function changeClass(value){return value>0?'up':value<0?'down':'';}
 function history(){
- const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
- const dailyRisk=calculateDrawdowns(trendDaily.nav,trendDaily.dates);
- $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大日度回撤</span><strong class="lot-risk">'+pct(dailyRisk.depth)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div><p class="meta fine">日度回撤截至 '+trendDaily.dates.at(-1)+' · '+drawdownDates(dailyRisk)+'。</p>';
+ const trail=trendDaily??{nav:[model.nav.at(-1)],dates:[rows[end][0]]};
+ const valueNow=trail.nav.at(-1), asof=trail.dates.at(-1);
+ const years=elapsed(asof,rows[START][0])/365.25,ann=(valueNow/10000)**(1/years)-1;
+ const dailyRisk=calculateDrawdowns(trail.nav,trail.dates);
+ $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大日度回撤</span><strong class="lot-risk">'+pct(dailyRisk.depth)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(valueNow)+'</strong></div></div><p class="meta fine">估值与回撤截至 '+asof+' · '+drawdownDates(dailyRisk)+'。</p>';
 
   const orders=model.rounds.map((r,j)=>({r,j})).reverse();
   const saleDate=(i,date)=>i===undefined?'—':'<button type="button" class="sale-date" data-week="'+i+'">'+date+'</button>';
@@ -229,8 +231,9 @@ function history(){
    const half=r.sales[0]!==undefined?rows[r.sales[0]][0]:null;
    const clear=sold?rows[r.end][0]:null;
    const lots=r.lots.map((l,slot)=>{
-    const {risk,useDaily,float}=lotHistory(r,l);
-    return '<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(l.ret)+'">'+pct(l.ret)+'</td>'+
+    const {risk,useDaily,float,points}=lotHistory(r,l);
+    const lotRet=useDaily&&points.length?points.at(-1).gain:l.ret;
+    return '<tr><td>'+rows[l.i][0]+'</td><td>'+fmt(l.cost)+'</td><td class="'+changeClass(lotRet)+'">'+pct(lotRet)+'</td>'+
      '<td class="lot-float-cell">'+pct(float.depth)+'</td>'+
      '<td><button type="button" class="risk-button" data-risk-round="'+j+'" data-risk-lot="'+slot+
      '" aria-expanded="false" aria-controls="history-lot-'+j+'">'+pct(risk.depth)+(useDaily?'':'（周线）')+'</button></td></tr>';
@@ -241,12 +244,15 @@ function history(){
     '<span><em>卖一半</em><b>'+saleDate(r.sales[0],half)+'</b></span>'+
     '<span><em>卖清</em><b>'+saleDate(r.end,clear)+'</b></span></div>';
    const rh=roundHistory(model,START,j);
+   const live=sold?null:rh;
+   const ret=live?live.points.at(-1).gain:r.ret;
+   const asof=live?live.through:rows[end][0];
    return '<details class="order" data-asset="'+r.asset+'" data-round="'+j+'"><summary>'+
     '<span class="order-main"><b>第 '+(j+1)+' 轮 · '+ASSETS[r.asset]+'</b>'+
     '<span class="order-state '+(sold?'done':'holding')+'">'+(sold?'已卖出':'持有中')+'</span>'+
-    '<em>'+first.slice(0,7)+(sold?' → '+clear.slice(0,7):' 起 · 按 '+rows[end][0]+' 估值')+'</em>'+
+    '<em>'+first.slice(0,7)+(sold?' → '+clear.slice(0,7):' 起 · 按 '+asof+' 估值')+'</em>'+
     '<em class="order-risk">最大回撤 <b>'+pct(rh.risk.depth)+'</b> · 最大浮亏 <b>'+pct(rh.float.depth)+'</b></em></span>'+
-    '<strong class="order-ret '+changeClass(r.ret)+'">'+(r.ret>0?'+':'')+pct(r.ret)+'</strong></summary>'+
+    '<strong class="order-ret '+changeClass(ret)+'">'+(ret>0?'+':'')+pct(ret)+'</strong></summary>'+
     '<div class="order-body">'+
     '<div class="round-chart" data-round="'+j+'"></div>'+timeline+
     '<div class="rows"><table><thead><tr><th>买入周</th><th>投入<span class="th-extra">（元）</span></th><th><span class="th-extra">该笔</span>收益</th><th title="买入后持仓市值相对买入本金的最大跌幅，与高点无关">最大浮亏</th><th><span class="th-extra">高点</span>回撤</th></tr></thead><tbody>'+lots+'</tbody></table></div>'+

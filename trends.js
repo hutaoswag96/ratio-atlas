@@ -68,7 +68,7 @@ function syncTrendControls() {
 }
 
 function refreshTrendCharts() {
- trendDaily = strategyDailySeries(rows,dailyTotalReturns,model,START);
+ trendDaily = strategyDailySeries(rows,valuationDaily(),model,START);
  tradeWeeks = new Map(model.trades.map(trade=>[rows[trade.i][0],trade.i]));
  refreshTrendQuotes(true);
 }

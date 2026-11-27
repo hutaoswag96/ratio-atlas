@@ -52,7 +52,7 @@ function syncTrendControls() {
  $('chart-from').value = trendDates[first];
  $('chart-to').value = trendDates[last];
  $('chart-year').value = activeCalendarYear;
- $('chart-range-status').textContent = '显示 ' + trendDates[first] + ' 至 ' + trendDates[last] + ' · ' + count + ' 个交易日';
+ $('chart-range-status').textContent = trendDates[first] + ' → ' + trendDates[last] + ' · ' + count + ' 个交易日';
  for (const button of $('ranges').querySelectorAll('button')) {
   button.setAttribute('aria-pressed', Number(button.dataset.n) === activePreset);
  }
@@ -174,26 +174,53 @@ function yAxis(values) {
  return { min, max, ticks, digits };
 }
 
+// 两条指数点位相差两倍以上，用对数刻度画实际点位：垂直间距就等于比值，不必归一到 100。
+const logFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 0 });
+
+function yAxisLog(values) {
+ const low = Math.min(...values), high = Math.max(...values);
+ const lo = Math.log10(low), hi = Math.log10(high);
+ const pad = (hi - lo) * .06 || .05;
+ const min = lo - pad, max = hi + pad;
+ let best = null;
+ for (const steps of [[1], [1, 2], [1, 2, 5], [1, 1.5, 2, 3, 4, 5, 7], [1, 1.2, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8], [1, 2, 3, 4, 5, 6, 7, 8, 9]]) {
+  const ticks = [];
+  for (let exp = Math.floor(lo) - 1; exp <= Math.ceil(hi); exp++) {
+   for (const m of steps) {
+    const value = m * 10 ** exp, position = Math.log10(value);
+    if (position > min && position < max) ticks.push(value);
+   }
+  }
+  if (ticks.length < 2) continue;
+  const score = Math.abs(ticks.length - 5);
+  if (!best || score < best.score) best = { score, ticks };
+ }
+ return { log: true, min, max, ticks: best ? best.ticks : [] };
+}
+
 function renderTrendCharts() {
  const { first, last } = trendRange;
  const indices = Array.from({ length: last - first + 1 }, (_, j) => first + j);
  for (const view of chartViews) {
   const p = makePlot(view);
   const series = view.index ? [
-   { values: indices.map(i => normalizedPoint(i, 1)), color: 'var(--up)' },
-   { values: indices.map(i => normalizedPoint(i, 2)), color: 'var(--blue)', dashed: true }
+   { values: indices.map(i => trendQuotes[i][1]), color: 'var(--up)' },
+   { values: indices.map(i => trendQuotes[i][2]), color: 'var(--blue)', dashed: true }
   ] : [
    { values: indices.map(i => bandAt(i).low), color: 'var(--low-line)', step: true, dashed: true },
    { values: indices.map(i => bandAt(i).high), color: 'var(--high-line)', step: true, dashed: true },
    { values: indices.map(i => ratioAt(i)), color: 'var(--ratio-ink)' }
   ];
-  const axis = yAxis(series.flatMap(line => line.values));
-  const y = value => p.base - (p.base - view.top) * (value - axis.min) / (axis.max - axis.min);
+  const axis = view.index ? yAxisLog(series.flatMap(line => line.values)) : yAxis(series.flatMap(line => line.values));
+  const y = axis.log
+   ? value => p.base - (p.base - view.top) * (Math.log10(value) - axis.min) / (axis.max - axis.min)
+   : value => p.base - (p.base - view.top) * (value - axis.min) / (axis.max - axis.min);
   view.geometry = p;
   view.y = y;
   let svg = axis.ticks.map(value =>
    '<path d="M'+p.left+' '+y(value)+'H'+p.right+'" stroke="var(--grid)"/>'+
-   '<text x="'+(p.left-7)+'" y="'+(y(value)+4)+'" text-anchor="end">'+Number(value.toFixed(axis.digits))+'</text>'
+   '<text x="'+(p.left-7)+'" y="'+(y(value)+4)+'" text-anchor="end">'+
+   (axis.log?logFormat.format(value):Number(value.toFixed(axis.digits)))+'</text>'
   ).join('');
   for (const line of series) {
    const d = line.values.map((value,j) => j && line.step ?
@@ -250,8 +277,8 @@ function renderLinkedReturns() {
  const first = allDates.findIndex(day=>day>=start), last = allDates.findLastIndex(day=>day<=endDate);
  const period = $('linked-return-period'), worst=$('linked-worst-draw'), scrub=$('linked-day');
  const context=$('linked-return-context');
- context.textContent=(usePlan?'执行单模拟 · 从 '+rows[planDaily.start][0]+' 以 ¥'+planMoney.format(planDaily.capital)+' 起步':'完整策略 · 从 1 万元起步')+
-  '。收益以所选区间首个可估值日为基准，回撤从区间内高点计算。';
+ context.textContent=(usePlan?'执行单 · '+rows[planDaily.start][0]+' 起 ¥'+planMoney.format(planDaily.capital):'完整策略 · 1 万元起')+
+  ' · 收益按区间首日、回撤按区间高点';
  dailyWindow = null;
  plot.el.setAttribute('viewBox', '0 0 '+plot.width+' '+plot.height);
  const labels = trendAxisLabels(plot);
@@ -399,7 +426,7 @@ function tradesAt(day) {
 
 function formatIndexPoint(day, column) {
  const value = trendQuotes[day][column], change = normalizedPoint(day, column) / 100 - 1;
- return pointFormat.format(value)+' 点（'+(change>0?'+':'')+pct(change)+'）';
+ return pointFormat.format(value)+'（较首日 '+(change>0?'+':'')+pct(change)+'）';
 }
 
 function updateTrendReadouts(index) {
@@ -427,7 +454,7 @@ function updateTrendReadouts(index) {
    diamond.setAttribute('transform', 'translate(0 '+view.y(ratio)+') rotate(45)');
    continue;
   }
-  const values = [normalizedPoint(index, 1), normalizedPoint(index, 2)];
+  const values = [trendQuotes[index][1], trendQuotes[index][2]];
   const colors = ['var(--up)','var(--blue)'];
   marker.querySelectorAll('circle').forEach((dot, i) => {
    dot.setAttribute('cy', view.y(values[i]));

@@ -512,3 +512,46 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
   .range-meta .hint-mouse { display: none; }
   .range-meta .hint-touch { display: inline; }
 }
+
+/* 次要说明：不参与决策的辅助文字统一降一级 */
+.fine,
+.meta.fine,
+details.fine p,
+.sheet .meta.fine { font-size: 12.5px; line-height: 1.65; color: var(--muted); }
+.index-title .fine { font-size: 12px; }
+details.fine { margin: 10px 0 0; }
+details.fine > summary {
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+  padding: 3px 0;
+}
+details.fine > summary::-webkit-details-marker { display: none; }
+details.fine > summary::before { content: "› "; color: var(--brand); }
+details.fine[open] > summary::before { content: "⌄ "; }
+details.fine p { margin: 4px 0 0; }
+
+/* 自选日期默认收起，点开占一整行 */
+#chart-date-panel[open] > summary { display: flex; }
+#chart-date-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 2px;
+  font-size: 13px;
+  color: var(--brand);
+  cursor: pointer;
+  list-style: none;
+}
+#chart-date-panel > summary::-webkit-details-marker { display: none; }
+#chart-date-panel > summary::after { content: "▾"; font-size: 11px; color: var(--muted); }
+#chart-date-panel[open] > summary::after { content: "▴"; }
+@media (min-width: 701px) {
+  #chart-date-panel { order: 4; }
+  #chart-date-panel[open] { flex-basis: 100%; }
+}
+@media (max-width: 700px) {
+  #chart-date-panel > summary { min-height: 44px; font-size: 14px; }
+}

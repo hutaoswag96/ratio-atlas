@@ -15,8 +15,8 @@ function renderDataStatus(){
  box.dataset.tone=pending?'pending':'ready';
  $('status-pill').textContent=pending?'待补录':'可使用';
  $('status-text').textContent=pending?
-  '周线停在 '+asof+' · '+from+' 至 '+to+' 已收盘，本周数据尚未补录，判断仍沿用 '+asof
-  :'周线 '+asof+' 已收盘 · 本周期指令适用于 '+from+' 至 '+to;
+  '判断沿用 '+asof+' 收盘，本周待补录'
+  :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to;
 }
 function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){
  const items=[];
@@ -112,7 +112,7 @@ function plan(){
   return '<div class="step '+(lot?'done':'')+'"><small>第 '+(j+1)+' 笔</small><b>'+
    (lot?'已买入':stage?'已停止':'待买')+'</b><small>'+date+'</small></div>';
  }).join('');
- body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3><p>'+why+'</p>'+
+ body.innerHTML='<h3>'+(stale?'截至 '+rows[end][0]+' · ':'')+title+'</h3>'+
   '<div class="steps" '+(round?'':'hidden')+'>'+steps+'</div>'+
   (round?'<p class="meta">模拟持仓 '+asset+' · 本轮每笔预算约 '+fmt(p.budget/5)+' 元</p>':'');
  const nextBuy=action?.kind==='buy'?{asset:action.asset,budget:p.budget/5}:null;
@@ -146,14 +146,13 @@ function renderProjection(){
  const weeksText=sessions===0?'等待周收盘确认':`约 ${Math.max(1,Math.ceil(lowDays/5))}–${Math.max(1,Math.ceil(highDays/5))} 周`;
  const moveText=value=>value===0?'已触及':pct(value);
  const confirmationText=side===0?'触线后，比值还需周线收复 13 周均线确认红利':'触线后，比值还需周线回落至 13 周均线下确认创业板';
- const nextText=nextAsset===null?'距离较近的首次建仓候选':`下一次换仓候选：${ASSETS[nextAsset]}`;
- panel.innerHTML='<div class="projection-head"><h3>情景推演</h3><span>参考估算 · 不构成交易信号</span></div>'+
-  '<p>按 '+latest[0]+' 日收盘比值 '+f(ratio)+' 推演，'+nextText+'。</p>'+
-  '<div class="projection-values"><div><span>到红利观察线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`比值下降 ${moveText(lowerDistance)}`)+'</strong></div>'+
-  '<div><span>到创业板观察线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`比值上升 ${moveText(upperDistance)}`)+'</strong></div>'+
+ const nextText=nextAsset===null?'按较近的观察线':`候选：${ASSETS[nextAsset]}`;
+ panel.innerHTML='<div class="projection-head"><h3>情景推演</h3><span>'+nextText+' · 估算</span></div>'+
+  '<div class="projection-values"><div><span>到红利线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`降 ${moveText(lowerDistance)}`)+'</strong></div>'+
+  '<div><span>到创业板线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`升 ${moveText(upperDistance)}`)+'</strong></div>'+
   '<div><span>候选换仓的粗略时间</span><strong>'+daysText+' · '+weeksText+'</strong></div></div>'+
-  '<p class="projection-note">'+confirmationText+'。</p>'+
-  '<details class="projection-how"><summary>估算口径</summary><p>粗略时间按近 60 个交易日比值平均绝对波动折算，假设波动延续；观察线按当前年度固定，实际路径可能更快、更慢，也可能始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p></details>';
+  '<p class="projection-note fine">'+confirmationText+'。</p>'+
+  '<details class="projection-how"><summary>估算口径</summary><p>按近 60 个交易日比值平均波动折算，假设波动延续；观察线全年固定，实际可能更快、更慢或始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p></details>';
 }
 function actualPlan(start,capital){
  const raw=$('holding').value,asset=raw===''?null:Number(raw),filled=asset===null?0:Number($('filled').value);
@@ -220,7 +219,7 @@ function changeClass(value){return value>0?'up':value<0?'down':'';}
 function history(){
  const years=elapsed(rows[end][0],rows[START][0])/365.25,ann=(model.nav.at(-1)/10000)**(1/years)-1;
  const dailyRisk=calculateDrawdowns(trendDaily.nav,trendDaily.dates);
- $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大日度回撤</span><strong class="lot-risk">'+pct(dailyRisk.depth)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div><p class="meta">日度回撤截至 '+trendDaily.dates.at(-1)+' · '+drawdownDates(dailyRisk)+'。</p>';
+ $('stats').innerHTML='<div class="stats"><div><span>历史年化</span><strong class="'+changeClass(ann)+'">'+pct(ann)+'</strong></div><div><span>最大日度回撤</span><strong class="lot-risk">'+pct(dailyRisk.depth)+'</strong></div><div><span>期末市值 / 元</span><strong>'+fmt(model.nav.at(-1))+'</strong></div></div><p class="meta fine">日度回撤截至 '+trendDaily.dates.at(-1)+' · '+drawdownDates(dailyRisk)+'。</p>';
 
   const orders=model.rounds.map((r,j)=>({r,j})).reverse();
   const saleDate=(i,date)=>i===undefined?'—':'<button type="button" class="sale-date" data-week="'+i+'">'+date+'</button>';
@@ -278,11 +277,9 @@ function floatSummary(){
  const worstRound=rounds.reduce((a,b)=>b.h.risk.depth<a.h.risk.depth?b:a);
  const worstRoundFloat=rounds.reduce((a,b)=>b.h.float.depth<a.h.float.depth?b:a);
  const label=item=>'第 '+(item.j+1)+' 轮第 '+(item.s+1)+' 笔'+(item.h.float.date?' · '+item.h.float.date:'');
- box.innerHTML='<b>两套风险口径</b>：最大浮亏以买入本金为基准，最大回撤以持有期最高点为基准——先涨 100% 再跌 20%，最大浮亏仍是 0，最大回撤才是 −20%。'+
-  '逐笔 '+every.length+' 笔，最大浮亏 <strong>'+pct(worst.h.float.depth)+'</strong>（'+label(worst)+'）；'+
-  '买入后 5 个交易日最大浮亏 <strong>'+pct(week.h.float.week.depth)+'</strong>（第 '+(week.j+1)+' 轮第 '+(week.s+1)+' 笔）。'+
-  '<br>按轮看账户：账户最大回撤 <strong>'+pct(worstRound.h.risk.depth)+'</strong>（第 '+(worstRound.j+1)+' 轮，'+worstRound.h.risk.peak+' 高点 → '+worstRound.h.risk.trough+' 谷底）；'+
-  '账户最大浮亏 <strong>'+pct(worstRoundFloat.h.float.depth)+'</strong>（第 '+(worstRoundFloat.j+1)+' 轮，'+worstRoundFloat.h.float.date+' 账户最低）。';
+ box.innerHTML='<b>两套口径</b>：浮亏按买入本金，回撤按持有期高点。'+every.length+' 笔里最深浮亏 <strong>'+pct(worst.h.float.depth)+'</strong>（'+label(worst)+'），首周最深 <strong>'+pct(week.h.float.week.depth)+'</strong>（第 '+(week.j+1)+' 轮第 '+(week.s+1)+' 笔）。<br>'+
+  '按轮看账户：最大回撤 <strong>'+pct(worstRound.h.risk.depth)+'</strong>（第 '+(worstRound.j+1)+' 轮，'+worstRound.h.risk.peak+' → '+worstRound.h.risk.trough+'）；'+
+  '最大浮亏 <strong>'+pct(worstRoundFloat.h.float.depth)+'</strong>（第 '+(worstRoundFloat.j+1)+' 轮，'+worstRoundFloat.h.float.date+'）。';
 }
 $('orders').onclick=e=>{
  const risk=e.target.closest('button[data-risk-lot]');
@@ -378,7 +375,7 @@ document.addEventListener('click',e=>{
 
 const mobileLayout = matchMedia('(max-width: 700px)');
 function syncChartDatePanel() {
- $('chart-date-panel').open = !mobileLayout.matches;
+ if (mobileLayout.matches) $('chart-date-panel').open = false;
 }
 syncChartDatePanel();
 mobileLayout.addEventListener('change', syncChartDatePanel);

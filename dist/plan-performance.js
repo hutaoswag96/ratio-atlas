@@ -316,8 +316,8 @@ function roundHistory(sim, base, index) {
 function strategyDailySeries(weeks, daily, simulation, start) {
  const last = start + simulation.positions.length - 1;
  const lastDate = weeks[last][0];
- // Value the current incomplete week, but wait for the next weekly close before
- // replaying any queued trades or showing dates beyond that checkpoint.
+ // Value the current incomplete week up to the next Friday close, but wait for that
+ // weekly bar before replaying any queued trades or showing later dates.
  const unverifiedFriday = weeklyValuationCutoff(lastDate);
  const dates = [], nav = [];
  let week = start;

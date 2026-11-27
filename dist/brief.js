@@ -15,7 +15,7 @@ function renderDataStatus(){
  box.dataset.tone=pending?'pending':'ready';
  $('status-pill').textContent=pending?'待补录':'可使用';
  $('status-text').textContent=pending?
-  '判断沿用 '+asof+' 收盘，本周待补录'
+  '判断沿用 '+asof+' 收盘 · 本周待补录；估值已跟到最近收盘'
   :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to;
 }
 function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){

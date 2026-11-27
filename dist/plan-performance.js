@@ -3,7 +3,33 @@
 const planMoney = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 });
 const signedMoney = amount => (amount > 0 ? '+' : amount < 0 ? '−' : '') + '¥' + planMoney.format(Math.abs(amount));
 
-const lotSeriesCache = new WeakMap();
+let lotSeriesCache = new WeakMap();
+let roundSeriesCache = new WeakMap();
+let valuationCache = { key: null, rows: dailyTotalReturns };
+
+// Total-return closes are published with a lag; the price indices arrive intraday.
+// Extend the last total-return point by the price-index move so valuation can follow
+// the latest close instead of waiting for the weekly snapshot rebuild.
+function valuationDaily() {
+ const live = typeof liveDailyPrices === 'undefined' ? [] : liveDailyPrices;
+ const key = live.length + '|' + (live.at(-1)?.[0] || '');
+ if (valuationCache.key === key) return valuationCache.rows;
+ valuationCache.key = key;
+ const anchor = dailyTotalReturns.at(-1);
+ const basis = typeof dailyPriceSnapshot === 'undefined' ? null :
+  dailyPriceSnapshot.find(row => row[0] === anchor?.[0]);
+ const tail = [];
+ if (anchor && basis) {
+  for (const [day, red, growth] of live) {
+   if (day <= anchor[0]) continue;
+   tail.push([day, anchor[1]*red/basis[1], anchor[2]*growth/basis[2]]);
+  }
+ }
+ valuationCache.rows = tail.length ? [...dailyTotalReturns, ...tail] : dailyTotalReturns;
+ lotSeriesCache = new WeakMap();
+ roundSeriesCache = new WeakMap();
+ return valuationCache.rows;
+}
 
 function clearPlanPerformance() {
  setPlanPerformanceScope(null);
@@ -12,22 +38,25 @@ function clearPlanPerformance() {
 }
 
 function renderPlanPerformance(simulation, start, capital) {
- const daily = strategyDailySeries(rows,dailyTotalReturns,simulation,start);
- const value = simulation.nav.at(-1), gain = value-capital, rate = gain/capital;
+ const series = valuationDaily();
+ const daily = strategyDailySeries(rows,series,simulation,start);
+ const value = daily ? daily.nav.at(-1) : simulation.nav.at(-1);
+ const asof = daily ? daily.dates.at(-1) : rows[end][0];
+ const gain = value-capital, rate = gain/capital;
  const noTrade = !simulation.rounds.length;
  const note = noTrade ? (simulation.orders.length ?
   '首笔已排队，现金零息。' :
   '区间内无成交，现金零息。') :
-  '已卖出按成交价计，持仓按截止周收盘估值。';
+  '已卖出按成交价计，持仓按最新收盘估值。';
  $('plan-return').innerHTML = `
-  <div class="plan-return-heading"><h3>模拟账户收益</h3><span>${rows[start][0]} 至 ${rows[end][0]}</span></div>
+  <div class="plan-return-heading"><h3>模拟账户收益</h3><span>${rows[start][0]} 至 ${asof}</span></div>
   <div class="stats plan-stats">
    <div class="primary-gain"><span>累计盈亏</span><strong class="${changeClass(gain)}">${signedMoney(gain)}</strong></div>
    <div><span>累计收益率</span><strong class="${changeClass(rate)}">${rate>0?'+':''}${pct(rate)}</strong></div>
    <div><span>账户总值</span><strong>¥${planMoney.format(value)}</strong></div>
    <div><span>最大周线回撤</span><strong class="${changeClass(simulation.draw)}">${pct(simulation.draw)}</strong></div>
   </div>
-  <p class="meta fine">${planMoney.format(capital)} 元起步 · ${note}</p>
+  <p class="meta fine">${planMoney.format(capital)} 元起步 · ${note} 信号仍按 ${rows[end][0]} 周线。</p>
   ${daily?'<a class="plan-history-link" href="#linked-performance" data-performance="plan">查看该起点的收益与回撤</a>':'<p class="meta">这个起点暂时没有日度估值。</p>'}
   ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}`;
  const full = $('full-plan');
@@ -43,7 +72,8 @@ function renderPlanPerformance(simulation, start, capital) {
 function weeklyValuationCutoff(day) {
  const time = Date.parse(day);
  const monday = time-(new Date(time).getUTCDay()+6)%7*DAY;
- return monday+11*DAY;
+ // The next Friday 15:00 Beijing close: that day counts, later days wait for a weekly bar.
+ return monday+11*DAY+7*3600000;
 }
 
 function calculateDrawdowns(nav, dates, initial=nav[0]) {
@@ -76,13 +106,14 @@ function lotFloat(observations,lot) {
 }
 
 function lotHistory(round,lot) {
+ const series=valuationDaily();
  const cached=lotSeriesCache.get(lot);
  if(cached)return cached;
  const first=rows[lot.i][0], last=rows[round.end??end][0], column=3+round.asset;
- const useDaily=dailyTotalReturns.at(-1)[0]>=last;
+ const useDaily=series.at(-1)[0]>=last;
  const weeklyCloses=new Map(rows.slice(lot.i,(round.end??end)+1).map(row=>[row[0],row[column]]));
  const cutoff=weeklyValuationCutoff(last);
- const observations=useDaily?dailyTotalReturns
+ const observations=useDaily?series
   .filter(([date])=>date>=first&&(round.end===undefined?Date.parse(date)<cutoff:date<=last))
   .map(row=>[row[0],weeklyCloses.get(row[0])??row[1+round.asset]]):[...weeklyCloses];
  const fills=new Map(lot.fills.map(fill=>[rows[fill.i][0],fill]));
@@ -116,11 +147,12 @@ function renderPlanLots(simulation, start) {
  const roundsHTML = rounds.map((round, index) => {
   const lotsHTML = round.lots.map((lot, slot) => {
    const id = String(lot.i);
-   const gain = lot.ret * lot.cost;
-   const {risk,useDaily,float}=lotHistory(round,lot);
+   const {risk,useDaily,float,points}=lotHistory(round,lot);
+   const lotRet=useDaily&&points.length?points.at(-1).gain:lot.ret;
+   const gain = lotRet * lot.cost;
    return `<details class="plan-lot" data-lot="${id}" ${open.has(id)?'open':''}>
     <summary><span>第 ${slot+1} 笔 <time>${rows[lot.i][0]}</time></span>
-    <span class="lot-summary-metrics"><strong class="${changeClass(gain)}">${signedMoney(gain)} <small>${gain>0?'+':''}${pct(lot.ret)}</small></strong>
+    <span class="lot-summary-metrics"><strong class="${changeClass(gain)}">${signedMoney(gain)} <small>${gain>0?'+':''}${pct(lotRet)}</small></strong>
     <small class="lot-risk">${useDaily?'最大回撤':'最大周线回撤'} <b>${pct(risk.depth)}</b></small>
     <small class="lot-float">最大浮亏 <b>${pct(float.depth)}</b></small></span></summary>
     <div class="lot-detail"></div>
@@ -246,19 +278,18 @@ function renderRoundChart(panel, sim, base, index) {
   <p class="meta">已卖出的部分按成交价转为现金，仍计入账户。</p>`;
 }
 
-const roundSeriesCache = new WeakMap();
-
 function roundHistory(sim, base, index) {
+ const series = valuationDaily();
  let map = roundSeriesCache.get(sim);
  if (!map) { map = new Map(); roundSeriesCache.set(sim, map); }
  if (map.has(index)) return map.get(index);
  const round = sim.rounds[index], first = round.start, last = round.end ?? end;
- const useDaily = dailyTotalReturns.at(-1)[0] >= rows[last][0];
+ const useDaily = series.at(-1)[0] >= rows[last][0];
  const cutoff = weeklyValuationCutoff(rows[last][0]);
  const dates = [], nav = [];
  if (useDaily) {
   let week = first;
-  for (const [date, red, growth] of dailyTotalReturns) {
+  for (const [date, red, growth] of series) {
    if (date < rows[first][0]) continue;
    if (round.end === undefined ? Date.parse(date) >= cutoff : date > rows[last][0]) break;
    while (week < last && rows[week+1][0] <= date) week++;

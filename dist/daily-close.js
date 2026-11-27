@@ -95,10 +95,19 @@ async function refreshDailyClose() {
   }
   if (!common.length) throw new Error('No shared dates');
   const snapshotEnd = dailyPriceSnapshot.at(-1)[0];
+  const previous = liveDailyPrices.at(-1)?.[0] ?? '';
   liveDailyPrices = mergeDailyCloses(liveDailyPrices, common.filter(row=>row[0]>snapshotEnd));
   save('daily-price-series',liveDailyPrices);
-  refreshTrendQuotes();
-  renderProjection();
+  const advanced = (liveDailyPrices.at(-1)?.[0] ?? '') !== previous;
+  if (advanced) {
+   // New closes roll the valuation forward; rebuild the panels that quote it.
+   refreshTrendCharts();
+   if (typeof plan === 'function') plan();
+   if (typeof history === 'function') history();
+  } else {
+   refreshTrendQuotes();
+   renderProjection();
+  }
   dailyError = false;
  } catch {
   dailyError = true;

@@ -16,9 +16,9 @@ function renderPlanPerformance(simulation, start, capital) {
  const value = simulation.nav.at(-1), gain = value-capital, rate = gain/capital;
  const noTrade = !simulation.rounds.length;
  const note = noTrade ? (simulation.orders.length ?
-  '首笔已排队，模拟尚未成交，现金按零利息计算。' :
-  '这段时间没有模拟成交，现金按零利息计算。') :
-  '已卖出部分按成交价计入，持仓按截止周收盘估值。';
+  '首笔已排队，现金零息。' :
+  '区间内无成交，现金零息。') :
+  '已卖出按成交价计，持仓按截止周收盘估值。';
  $('plan-return').innerHTML = `
   <div class="plan-return-heading"><h3>模拟账户收益</h3><span>${rows[start][0]} 至 ${rows[end][0]}</span></div>
   <div class="stats plan-stats">
@@ -27,7 +27,7 @@ function renderPlanPerformance(simulation, start, capital) {
    <div><span>账户总值</span><strong>¥${planMoney.format(value)}</strong></div>
    <div><span>最大周线回撤</span><strong class="${changeClass(simulation.draw)}">${pct(simulation.draw)}</strong></div>
   </div>
-  <p class="meta">以 ${planMoney.format(capital)} 元起步。 ${note}</p>
+  <p class="meta fine">${planMoney.format(capital)} 元起步 · ${note}</p>
   ${daily?'<a class="plan-history-link" href="#linked-performance" data-performance="plan">查看该起点的收益与回撤</a>':'<p class="meta">这个起点暂时没有日度估值。</p>'}
   ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}`;
  const full = $('full-plan');

@@ -82,7 +82,7 @@ async function refreshDailyClose() {
  dailyPending = true;
  try {
   const china = Date.now() + 8*3600000;
-  const cutoff = new Date(china - (new Date(china).getUTCHours() < 16 ? DAY : 0));
+  const cutoff = new Date(china - (new Date(china).getUTCHours() < 15 ? DAY : 0));
   const last = cutoff.toISOString().slice(0,10);
   const recent = new Date(+cutoff - 45*DAY).toISOString().slice(0,10);
   const first = [liveDailyPrices.at(-1)?.[0]??dailyPriceSnapshot.at(-1)[0], recent].sort()[0];

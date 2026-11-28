@@ -479,9 +479,9 @@ function updateTrendReadouts(index) {
    });
    const labels = cross.querySelectorAll('text');
    labels.forEach((label, i) => {
-    let ly = keepBetween(ys[i] - 5, view.top + 10, p.base - 4);
+    let ly = keepBetween(ys[i] - 8, view.top + 10, p.base - 4);
     if (labels.length > 1 && Math.abs(ys[0] - ys[1]) < 13) ly += i ? 7 : -7;
-    label.setAttribute('x', p.right - 2);
+    label.setAttribute('x', p.right - 10);
     label.setAttribute('y', ly);
     label.textContent = view.index ? logFormat.format(values[i]) : f(values[i]);
    });

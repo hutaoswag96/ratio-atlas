@@ -95,6 +95,11 @@ function refreshTrendQuotes(force=false) {
   const history = rows.filter(row=>row[0]<year+'-01-01').map(row=>row[2]/row[1]).sort((a,b)=>a-b);
   trendBands.set(year,{low:quantile(history,.2),high:quantile(history,.8)});
  }
+ const limited = bandOverride && bandOverride.scope==='current' ? trendDates.at(-1).slice(0,4) : null;
+ if (bandOverride) for (const year of years) {
+  if (limited && year !== limited) continue;
+  trendBands.set(year,{low:bandOverride.low,high:bandOverride.high});
+ }
  $('chart-year').replaceChildren(new Option('选择年份', ''), ...years.map(year => new Option(year + ' 年', year)));
  for (const input of [$('chart-from'), $('chart-to')]) {
   input.min = trendDates[0];

@@ -79,7 +79,7 @@
    <output class="index-readout" id="linked-return-readout" for="linked-day"></output>
   </div>
 </section>
-<details><summary>为什么观察线会移动？</summary><p>每年初用 2011 年以来的周比值取 20% / 80% 分位定线，全年不变：低线（20% 分位）是创业板线，高线（80% 分位）是红利线。日线只看位置，周收盘入区并确认后才下单。</p></details></section>
+<details><summary>为什么观察线会移动？</summary><p>自动模式下每年初用 2011 年以来的周比值取 20% / 80% 分位定线，全年不变：低线（20% 分位）是创业板线，高线（80% 分位）是红利线。日线只看位置，周收盘入区并确认后才下单。<br>改用手动后，两条线在全部历史上固定，买卖点与回测都按这组线重算——只是换一个阈值看历史，不是新的预测。</p></details></section>
 <section class="sheet" id="plan">
  <div class="heading"><h2>本轮执行单</h2><a class="plan-history-link" href="#linked-performance" data-performance="full">收益与回撤</a></div>
  <div id="planBody" aria-live="polite"></div>
@@ -111,6 +111,16 @@
     </label>
    </div>
   </div></div>
+  <fieldset class="band-picker" id="band-picker">
+   <legend>观察线 <span class="fine">比值低于创业板线转创业板，高于红利线转红利</span></legend>
+   <div class="form">
+    <label>取值方式<select id="band-mode"><option value="auto">自动 · 年度分位</option><option value="fixed">手动 · 固定线</option></select></label>
+    <label>作用范围<select id="band-scope"><option value="all">全部历史</option><option value="current">仅今年</option></select></label>
+    <label>创业板线（低）<input id="band-low" type="number" min="0.001" max="9.999" step="0.001" inputmode="decimal"></label>
+    <label>红利线（高）<input id="band-high" type="number" min="0.001" max="9.999" step="0.001" inputmode="decimal"></label>
+   </div>
+   <p class="meta fine" id="band-note"></p>
+  </fieldset>
   <p class="meta" id="planHelp"></p>
  </details>
  <div id="plan-return"></div><div id="plan-lots"></div>

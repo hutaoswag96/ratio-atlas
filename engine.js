@@ -2,10 +2,22 @@
 const ASSETS=['中证红利','创业板指'], START=156, FEE=.001, DAY=86400000;
 const elapsed=(a,b)=>(Date.parse(a)-Date.parse(b))/DAY;
 function quantile(sorted,p){const n=(sorted.length-1)*p,j=Math.floor(n);return sorted[j]+(n-j)*(sorted[Math.min(j+1,sorted.length-1)]-sorted[j]);}
+// Manual lines: once set, the same low/high pair replaces the yearly 20%/80%
+// quantiles. scope 'all' replays the whole history against it; 'current' only
+// re-anchors the latest year and leaves earlier years on their own quantiles.
+let bandOverride=null;
+function setBandOverride(band){bandOverride=band&&band.low>0&&band.high>band.low?{low:band.low,high:band.high,scope:band.scope==='current'?'current':'all'}:null;return bandOverride;}
 function market(rows){
  const ratios=rows.map(r=>r[2]/r[1]);let year,low,high;
+ const limited=bandOverride&&bandOverride.scope==='current'?rows[rows.length-1][0].slice(0,4):null;
  return rows.map((row,i)=>{
   if(i<START)return null;
+  const fixed=bandOverride&&(!limited||row[0].slice(0,4)===limited);
+  if(fixed){
+   // Growth/red: the low band means growth is cheap, the high band means red is.
+   const r=ratios[i],avg=ratios.slice(i-12,i+1).reduce((a,b)=>a+b)/13;
+   return {r,avg,low:bandOverride.low,high:bandOverride.high,zone:r<=bandOverride.low?1:r>=bandOverride.high?0:null};
+  }
   if(row[0].slice(0,4)!==year){
    year=row[0].slice(0,4);const history=ratios.slice(0,i).sort((a,b)=>a-b);
    low=quantile(history,.2);high=quantile(history,.8);

@@ -662,8 +662,59 @@ function touchEnd(view, e, cancelled) {
  return true;
 }
 
+/* ---------- 桌面滚轮 / 触控板：捏合缩放、左右滑动平移 ---------- */
+let wheelState = null, wheelZoom = null;
+
+function wheelTrend(view, plot, e) {
+ if (!trendRange) return;
+ const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
+ const dx = e.deltaX * scale, dy = e.deltaY * scale;
+ const pinch = e.ctrlKey;
+ const sideways = Math.abs(dx) > Math.abs(dy) * 1.15;
+ // 竖向滚动没按修饰键时交还页面，别把整页滚动也吃掉
+ if (!pinch && !sideways) return;
+ if (e.cancelable) e.preventDefault();
+ const total = trendDates.length;
+ const { first, last } = trendRange;
+ const count = last - first + 1;
+ const p = view.geometry;
+ const left = plot.getBoundingClientRect().left;
+ const fraction = keepBetween((e.clientX - left - p.left) / Math.max(1, p.right - p.left), 0, 1);
+ const now = performance.now();
+
+ if (pinch) {
+  // 触控板捏合在浏览器里就是 ctrl+wheel：deltaY 为负表示张开（放大）
+  // 一次手势内累积缩放，基准固定，避免逐次取整造成漂移或迟钝
+  if (!wheelZoom || wheelZoom.view !== view || now - wheelZoom.at > 180) {
+   wheelZoom = { view, first, last, count, fraction, acc: 0 };
+  }
+  wheelZoom.at = now;
+  wheelZoom.acc += dy;
+  const next = keepBetween(Math.round(wheelZoom.count * Math.exp(wheelZoom.acc * .004)), TOUCH_MIN_DAYS, total);
+  if (next === count) return;
+  const anchor = wheelZoom.first + wheelZoom.fraction * (wheelZoom.count - 1);
+  const start = keepBetween(Math.round(anchor - wheelZoom.fraction * (next - 1)), 0, total - next);
+  queueTrendRange(start, start + next - 1);
+  return;
+ }
+
+ // 横向滑动：按像素累积，避免零碎的小 delta 被取整吞掉
+ if (!wheelState || wheelState.view !== view || now - wheelState.at > 140) {
+  wheelState = { view, first, acc: 0 };
+ }
+ wheelState.at = now;
+ const pxPerDay = Math.max(.5, (p.right - p.left) / Math.max(1, count - 1));
+ wheelState.acc += dx;
+ const step = Math.trunc(wheelState.acc / pxPerDay);
+ if (!step) return;
+ wheelState.acc -= step * pxPerDay;
+ const start = keepBetween(wheelState.first + step, 0, total - count);
+ queueTrendRange(start, start + count - 1);
+}
+
 function bindTrendPlot(view) {
  const plot = $(view.plot), tip = $(view.tip);
+ plot.addEventListener('wheel', e => wheelTrend(view, plot, e), { passive: false });
  plot.onpointerdown = e => {
   if (e.pointerType === 'touch') { touchStart(view, plot, e); return; }
   if (e.button !== 0) return;

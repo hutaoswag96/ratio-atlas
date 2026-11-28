@@ -166,11 +166,18 @@ function bandAt(day) {
  return trendBands.get(trendDates[day].slice(0,4));
 }
 
-function yAxis(values) {
+function yAxis(values, preferredStep) {
  const low = Math.min(...values), high = Math.max(...values);
  const rough = (high - low || Math.max(Math.abs(high) * .04, .01)) / 4;
  const scale = 10 ** Math.floor(Math.log10(rough));
- const step = ([1, 2, 2.5, 5, 10].find(n => n * scale >= rough) || 10) * scale;
+ let step = ([1, 2, 2.5, 5, 10].find(n => n * scale >= rough) || 10) * scale;
+ // 比值读数量级在 0.3–0.9，默认每 0.1 一条刻线；窗口很窄时按 0.05/0.02/0.01 细化，避免只剩一两根。
+ if (preferredStep) {
+  const span = Math.max(1e-9, high - low);
+  const finer = [preferredStep, preferredStep / 2, preferredStep / 5, preferredStep / 10]
+   .find(candidate => span / candidate >= 3) || preferredStep / 10;
+  step = Math.min(finer, step);
+ }
  const min = Math.floor(low / step + 1e-9) * step - step * .22;
  const max = Math.ceil(high / step - 1e-9) * step + step * .22;
  const ticks = [];
@@ -216,7 +223,7 @@ function renderTrendCharts() {
    { values: indices.map(i => bandAt(i).high), color: 'var(--high-line)', step: true, dashed: true },
    { values: indices.map(i => ratioAt(i)), color: 'var(--ratio-ink)' }
   ];
-  const axis = view.index ? yAxisLog(series.flatMap(line => line.values)) : yAxis(series.flatMap(line => line.values));
+  const axis = view.index ? yAxisLog(series.flatMap(line => line.values)) : yAxis(series.flatMap(line => line.values), .1);
   const y = axis.log
    ? value => p.base - (p.base - view.top) * (Math.log10(value) - axis.min) / (axis.max - axis.min)
    : value => p.base - (p.base - view.top) * (value - axis.min) / (axis.max - axis.min);
@@ -240,8 +247,14 @@ function renderTrendCharts() {
   }
   if (!view.index) svg += tradeMarkers(p, y, first, last);
   svg += trendAxisLabels(p);
+  // 选中日的十字准星：竖线跟到横轴，横向虚线标出该日的取值。
+  const cross = view.index
+   ? '<line stroke="var(--up)" stroke-dasharray="3 3" stroke-opacity=".6"/><line stroke="var(--blue)" stroke-dasharray="3 3" stroke-opacity=".6"/>'+
+     '<text class="h-label" fill="var(--up)" text-anchor="end"/><text class="h-label" fill="var(--blue)" text-anchor="end"/>'
+   : '<line stroke="var(--subtle)" stroke-dasharray="3 3"/><text class="h-label" fill="var(--muted)" text-anchor="end"/>';
   p.el.setAttribute('viewBox', '0 0 '+p.width+' '+p.height);
   p.el.innerHTML = '<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">'+svg+
+   '</g><g class="h-marker" pointer-events="none">'+cross+
    '</g><g class="week-marker" pointer-events="none"><line stroke="var(--subtle)" stroke-dasharray="3 3"/>'+
    (view.index?'<circle r="3.8"/><circle r="3.8"/>':'<rect class="ratio-diamond" x="-4" y="-4" width="8" height="8"/>')+'</g>';
  }
@@ -454,12 +467,30 @@ function updateTrendReadouts(index) {
   const line = marker.querySelector('line');
   line.setAttribute('y1', view.top);
   line.setAttribute('y2', p.base);
+  const values = view.index ? [trendQuotes[index][1], trendQuotes[index][2]] : [ratio];
+  const cross = p.el.querySelector('.h-marker');
+  if (cross) {
+   const ys = values.map(value => view.y(value));
+   cross.querySelectorAll('line').forEach((hLine, i) => {
+    hLine.setAttribute('x1', p.left);
+    hLine.setAttribute('x2', p.right);
+    hLine.setAttribute('y1', ys[i]);
+    hLine.setAttribute('y2', ys[i]);
+   });
+   const labels = cross.querySelectorAll('text');
+   labels.forEach((label, i) => {
+    let ly = keepBetween(ys[i] - 5, view.top + 10, p.base - 4);
+    if (labels.length > 1 && Math.abs(ys[0] - ys[1]) < 13) ly += i ? 7 : -7;
+    label.setAttribute('x', p.right - 2);
+    label.setAttribute('y', ly);
+    label.textContent = view.index ? logFormat.format(values[i]) : f(values[i]);
+   });
+  }
   const diamond = marker.querySelector('.ratio-diamond');
   if (diamond) {
    diamond.setAttribute('transform', 'translate(0 '+view.y(ratio)+') rotate(45)');
    continue;
   }
-  const values = [trendQuotes[index][1], trendQuotes[index][2]];
   const colors = ['var(--up)','var(--blue)'];
   marker.querySelectorAll('circle').forEach((dot, i) => {
    dot.setAttribute('cy', view.y(values[i]));

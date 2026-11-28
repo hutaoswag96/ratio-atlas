@@ -72,26 +72,23 @@ function applyBandPref(){
 function syncBandControls(){
  const picker=$('band-picker');if(!picker)return;
  const pref=bandPref(),m=bars[end],note=$('band-note');
- $('band-mode').value=pref.mode;
- $('band-scope').value=pref.mode==='fixed'?pref.scope:'all';
  picker.dataset.mode=pref.mode;
+ $('band-scope').value=pref.mode==='fixed'?pref.scope:'all';
  const low=pref.mode==='fixed'?pref.low:m.low,high=pref.mode==='fixed'?pref.high:m.high;
- if(!['band-mode','band-scope','band-low','band-high'].includes(document.activeElement?.id)){
+ if(!['band-low','band-high'].includes(document.activeElement?.id)){
   $('band-low').value=trim3(low);$('band-high').value=trim3(high);
  }
- for(const id of ['band-scope','band-low','band-high'])$(id).disabled=pref.mode!=='fixed';
  if(pref.mode==='fixed'){
   const trail=trendDaily?.nav?.length?trendDaily:null;
   const total=(trail?trail.nav.at(-1):model.nav.at(-1))/10000-1;
   const risk=trail?calculateDrawdowns(trail.nav,trail.dates).depth:model.draw;
   const scope=pref.scope==='current'?'仅今年（'+rows[end][0].slice(0,4)+'）改线，往年仍按各自年度分位':'重算全部历史';
-  note.innerHTML='已按 <b>'+f(pref.low)+' / '+f(pref.high)+'</b> '+scope+'：'+model.rounds.length+' 轮，累计 <b class="'+changeClass(total)+'">'+(total>0?'+':'')+pct(total)+'</b>，最大回撤 '+pct(risk)+'。';
+  note.innerHTML='已按 <b>'+f(pref.low)+' / '+f(pref.high)+'</b> '+scope+'：'+model.rounds.length+' 轮，累计 <b class="'+changeClass(total)+'">'+(total>0?'+':'')+pct(total)+'</b>，最大回撤 '+pct(risk)+'。点「恢复默认」回到年度分位。';
  }else{
-  note.textContent='现用 '+rows[end][0].slice(0,4)+' 年分位线 '+f(m.low)+' / '+f(m.high)+'；改手动可固定一组线重算。';
+  note.innerHTML='现用 '+rows[end][0].slice(0,4)+' 年分位线 <b>'+f(m.low)+' / '+f(m.high)+'</b>。把上面两个数改成你想要的阈值，再点「应用参数」，全站改用固定线重算。';
  }
 }
-function commitBands(){
- const mode=$('band-mode').value;
+function commitBands(mode='fixed'){
  if(mode==='fixed'){
   const low=Number($('band-low').value),high=Number($('band-high').value);
   if(!(low>0)||!(high>0)||!(high>low)){$('band-note').innerHTML='<b class="stale-warn">红利线要高于创业板线，且都大于 0。</b>';return;}
@@ -390,14 +387,13 @@ $('sold').value=SWAP_STATES.includes(actual.state)?actual.state:(actual.half?'ha
 $('basis').value=get('basis','model');$('basis').onchange=mode;
 for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='none';$('sold').value=SWAP_STATES.includes($('sold').value)?$('sold').value:($('sold').value==='1'?'half':'none');plan();};
 if($('basis').value==='actual')$('capital').value=actual.capital||10000;
-$('band-mode').onchange=()=>{
- if($('band-mode').value==='fixed'){
-  const m=bars[end];
-  $('band-low').value=trim3(m.low);$('band-high').value=trim3(m.high);
- }
- commitBands();
-};
-for(const id of ['band-scope','band-low','band-high'])$(id).onchange=commitBands;
+$('band-apply').onclick=()=>commitBands('fixed');
+$('band-reset').onclick=()=>commitBands('auto');
+for(const id of ['band-low','band-high']){
+ $(id).onchange=()=>{if(bandPref().mode==='fixed')commitBands('fixed');};
+ $(id).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();commitBands('fixed');}});
+}
+$('band-scope').onchange=()=>{if(bandPref().mode==='fixed')commitBands('fixed');};
 setupTrendCharts();renderFundList();refresh();mode();
 if(typeof refreshAutoWeeks==='function')refreshAutoWeeks();
 refreshDailyClose();

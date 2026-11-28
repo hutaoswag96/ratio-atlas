@@ -320,19 +320,28 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 #plan-settings #position-fields { display: contents; }
 #plan-settings #position-fields[hidden] { display: none; }
 #plan-settings #actualFields .form { align-items: end; }
-#plan-settings .band-picker { margin: 12px 0 2px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); min-width: 0; }
-#plan-settings .band-picker legend { padding: 0; font-size: 13px; color: var(--brand); }
-#plan-settings .band-picker legend .fine { margin-left: 6px; font-weight: 400; }
-#plan-settings .band-picker .form { margin: 6px 0 0; }
-#plan-settings .band-picker .form label { font-size: 13px; }
-#plan-settings .band-picker input:disabled { color: var(--muted); background: transparent; opacity: .75; }
-#plan-settings .band-picker[data-mode="fixed"] legend { color: var(--up); }
-#band-note { margin: 6px 0 4px; }
+#band-note { margin: 8px 0 2px; max-width: 82ch; }
 @media (max-width: 700px) {
   #plan-settings { padding-inline: 10px; }
   #plan-setup-summary { margin-left: 0; }
   #plan-settings #actualFields .form { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
+
+/* 参数调整：全站生效的比值阈值 */
+#params .heading { margin-bottom: 8px; }
+.param-lead { color: var(--muted); font-size: 14px; line-height: 1.7; max-width: 66ch; }
+.param-lead b { color: var(--ink); font-weight: 600; }
+#params .band-picker { margin: 14px 0 0; padding: 14px 16px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-tint); min-width: 0; }
+#params .band-picker legend { padding: 0 6px; font-size: 13px; font-weight: 600; color: var(--brand); }
+#params .band-picker legend .fine { margin-left: 6px; font-weight: 400; }
+#params .band-hint { margin: 0; }
+#params .band-picker .form { margin: 8px 0 0; grid-template-columns: repeat(auto-fit,minmax(min(100%,170px),1fr)); }
+#params .band-picker .form label { font-size: 13px; }
+#params .band-picker[data-mode="fixed"] legend { color: var(--up); }
+.param-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.param-actions button { min-height: 40px; padding-inline: 18px; }
+.param-actions #band-reset { color: var(--brand); border-color: var(--field); background: var(--surface); }
+.param-actions #band-reset:hover { border-color: var(--brand); }
 
 .return-key { color: var(--account-ink); }
 #linked-return-plot { display: block; width: 100%; height: clamp(185px,17vw,250px); cursor: crosshair; touch-action: pan-y; }

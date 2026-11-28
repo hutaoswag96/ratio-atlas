@@ -15,44 +15,44 @@ function renderDataStatus(){
  const box=$('data-status');if(!box)return;
  box.dataset.tone=pending?'pending':'ready';
  $('status-pill').textContent=pending?'待更新':auto?'自动':'可使用';
- $('status-text').textContent=pending?
-  '判断沿用 '+asof+' 收盘 · 本周周线还没拿到，页面会自动重试；估值已跟到最近收盘'
-  :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to+(auto?' · 当日自动生成':'');
+ $('status-text').innerHTML=pending?
+  '判断沿用 '+asof+' 收盘 · 周线待更新'+moreNote('本周周线还没拿到，页面会自动重试；估值已跟到最近收盘。')
+  :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to;
 }
 function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){
  const items=[];
  if(watch===null){
-  items.push({label:'入区',ok:false,detail:'比值 '+f(r)+' 在 '+f(low)+' 与 '+f(high)+' 两线之间'});
+  items.push({label:'入区',ok:false,detail:f(r)+' 在 '+f(low)+'–'+f(high)+' 之间'});
  }else{
   const tb=bars[touch];
-  items.push({label:'入区',ok:true,detail:rows[touch][0]+' 周收盘 · 比值 '+f(tb.r)+' '+(watch===0?'≥ 红利线 ':'≤ 创业板线 ')+f(watch===0?tb.high:tb.low)+' · 观察'+ASSETS[watch]});
+  items.push({label:'入区',ok:true,detail:rows[touch][0]+' · 比值 '+f(tb.r)+' '+(watch===0?'≥ 红利线 ':'≤ 创业板线 ')+f(watch===0?tb.high:tb.low)+' · 观察'+ASSETS[watch]});
  }
  const weeks=watch===null?null:end-touch+1;
  const watchValid=watch!==null&&weeks<=13;
  const confirmed=watchValid&&(watch===0?r<avg:r>avg);
- if(watch===null)items.push({label:'转强确认',ok:false,detail:'未入区，13 周均值条件不启用'});
- else if(weeks>13)items.push({label:'转强确认',ok:false,detail:'观察期已满 13 周，需要重新入区'});
- else items.push({label:'转强确认',ok:confirmed,detail:'比值 '+f(r)+' 需'+(watch===0?'低于':'高于')+' 13 周均值 '+f(avg)+' · 观察期第 '+weeks+'/13 周'});
- if(side===null||!count)items.push({label:'买入间隔',ok:false,detail:'首笔无需等待 28 天；仍须先入区并完成转强确认'});
- else if(count>=5)items.push({label:'买入间隔',ok:true,detail:'本轮五笔已买完，接下来只等对侧换仓'});
+ if(watch===null)items.push({label:'转强确认',ok:false,detail:'未入区'});
+ else if(weeks>13)items.push({label:'转强确认',ok:false,detail:'已满 13 周，需重新入区'});
+ else items.push({label:'转强确认',ok:confirmed,detail:'比值 '+f(r)+' 需'+(watch===0?'低于':'高于')+' 13 周均值 '+f(avg)+' · 第 '+weeks+'/13 周'});
+ if(side===null||!count)items.push({label:'买入间隔',ok:false,detail:'首笔无需间隔'});
+ else if(count>=5)items.push({label:'买入间隔',ok:true,detail:'五笔已买完，只等对侧换仓'});
  else{
   const days=lastBuyDay?Math.floor(elapsed(rows[end][0],lastBuyDay)):null;
   items.push({label:'买入间隔',ok:days!==null&&days>=28,detail:days===null?'请填写上次买入日':'上次买入 '+lastBuyDay+' · 已过 '+days+'/28 天'});
  }
  if(side===null){
-  const detail=watch===null?'空仓；当前比值未进入观察区，没有建仓方向':!watchValid?'空仓；观察期已超过 13 周，需重新入区':confirmed?'空仓；'+ASSETS[watch]+'首笔条件已满足，按执行单安排建仓':'空仓；正在观察'+ASSETS[watch]+'，等待 13 周均线转强确认';
+  const detail=watch===null?'空仓 · 未入区':!watchValid?'空仓 · 观察期已过':confirmed?'空仓 · 首笔条件已满足':'空仓 · 等'+ASSETS[watch]+'确认';
   items.push({label:'建仓',ok:watchValid&&confirmed,detail});
  }
  else{
   const other=1-side;
-  items.push({label:'换边',ok:watch===other&&confirmed,detail:'当前持有 '+ASSETS[side]+' · 需对侧入区，并在 13 周内完成转强确认'+(watch===other?'（当前观察'+ASSETS[other]+'）':'')});
+  items.push({label:'换边',ok:watch===other&&confirmed,detail:'持有'+ASSETS[side]+' · 等对侧入区并确认'+(watch===other?'（正观察'+ASSETS[other]+'）':'')});
  }
  return items;
 }
 function renderEvidence(title,items){
  const box=$('plan-evidence');if(!box)return;
  if(!items?.length){box.replaceChildren();return;}
- box.innerHTML='<div class="evidence-head"><h4>'+title+'</h4><span>逐项核对下单条件；未满足时不会触发操作</span></div><ol class="evidence">'+
+ box.innerHTML='<div class="evidence-head"><h4>'+title+'</h4></div><ol class="evidence">'+
   items.map(item=>'<li class="'+(item.ok?'ok':'no')+'"><b>'+item.label+'</b><span>'+item.detail+'</span></li>').join('')+'</ol>';
 }
 const cachedDailyPrices=get('daily-price-series',[]);
@@ -85,7 +85,7 @@ function syncBandControls(){
   const scope=pref.scope==='current'?'仅今年（'+rows[end][0].slice(0,4)+'）改线，往年仍按各自年度分位':'重算全部历史';
   note.innerHTML='已按 <b>'+f(pref.low)+' / '+f(pref.high)+'</b> '+scope+'：'+model.rounds.length+' 轮，累计 <b class="'+changeClass(total)+'">'+(total>0?'+':'')+pct(total)+'</b>，最大回撤 '+pct(risk)+'。点「恢复默认」回到年度分位。';
  }else{
-  note.innerHTML='现用 '+rows[end][0].slice(0,4)+' 年分位线 <b>'+f(m.low)+' / '+f(m.high)+'</b>。把上面两个数改成你想要的阈值，再点「应用参数」，全站改用固定线重算。';
+  note.innerHTML='现用 '+rows[end][0].slice(0,4)+' 年分位线 <b>'+f(m.low)+' / '+f(m.high)+'</b>。改数后点「应用参数」即改用固定线。';
  }
 }
 function commitBands(mode='fixed'){
@@ -146,7 +146,7 @@ function plan(){
  const p=simulate(rows,bars,start,capital),q=p.orders,action=q[0],stale=signalPending();
  const known=p.watch!==null&&end-p.touch<13,asset=p.side===null?'现金':ASSETS[p.side],round=p.rounds.at(-1);
  const title=action?.kind==='sell'?(q.length===2?'下一步：卖清旧仓':'下一步：卖出一半'):action?'买入'+ASSETS[action.asset]+'第 '+(p.count+1)+' 笔':p.side!==null?'继续持有'+asset:known?'等待转强确认':'空仓等待';
- let why=action?.kind==='sell'?(q.length===2?'第一笔卖出已完成。下方按成交顺序列出剩余步骤。':'另一边已经确认转强。下周收盘卖出旧仓的一半。'):action?'下一共同交易周收盘，计划投入 '+fmt(p.budget/5)+' 元。':p.side===null?(known?'已经进入观察窗口，等待比值满足 13 周均线条件。':'从所选起点观察，尚无有效建仓信号，保留现金。'):p.count===5?'本轮五笔已到位，等待另一侧入区并确认转强。':'等上一笔成交满 28 天，在首个周收盘检查加仓条件。';
+ let why=action?.kind==='sell'?(q.length===2?'第一笔已卖出，下方是剩余步骤。':'对侧已确认，下周收盘卖出旧仓一半。'):action?'下周收盘投入 '+fmt(p.budget/5)+' 元。':p.side===null?(known?'已入区，等比值穿过 13 周均值。':'尚无建仓信号，保留现金。'):p.count===5?'五笔已到位，等对侧确认。':'上一笔满 28 天后，下个周收盘看加仓。';
  $('signalLabel').textContent=(stale?'周线待补录':'最新周线判断')+'　/　'+(start===end?'本周空仓起步':'按 '+rows[start][0]+' 起步');
  const tone=title.includes('卖')||title.includes('赎回')?'warning':title.includes('买入')||title.includes('申购')||title.includes('准备第')?'buy':'neutral';
  $('headline').dataset.tone=stale?'warning':tone;
@@ -192,13 +192,13 @@ function renderProjection(){
  const daysText=sessions===0?'观察线已触及':`约 ${lowDays}–${highDays} 个交易日`;
  const weeksText=sessions===0?'等待周收盘确认':`约 ${Math.max(1,Math.ceil(lowDays/5))}–${Math.max(1,Math.ceil(highDays/5))} 周`;
  const moveText=value=>value===0?'已触及':pct(value);
- const confirmationText=side===0?'触线后，比值还需周线跌到 13 周均线下方确认红利':'触线后，比值还需周线升到 13 周均线上方确认创业板';
+ const confirmationText=side===0?'周收盘跌破 13 周均值':'周收盘升过 13 周均值';
  const nextText=nextAsset===null?'按较近的观察线':`候选：${ASSETS[nextAsset]}`;
  panel.innerHTML='<div class="projection-head"><h3>情景推演</h3><span>'+nextText+' · 估算</span></div>'+
   '<div class="projection-values"><div><span>到创业板线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`降 ${moveText(lowerDistance)}`)+'</strong></div>'+
   '<div><span>到红利线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`升 ${moveText(upperDistance)}`)+'</strong></div>'+
   '<div><span>候选换仓的粗略时间</span><strong>'+daysText+' · '+weeksText+'</strong></div></div>'+
-  '<p class="projection-note fine">'+confirmationText+'。</p>'+
+  '<p class="projection-note fine">确认条件：'+confirmationText+'。</p>'+
   '<details class="projection-how"><summary>估算口径</summary><p>按近 60 个交易日比值平均波动折算，假设波动延续；观察线全年固定，实际可能更快、更慢或始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p></details>';
 }
 function actualPlan(start,capital){
@@ -220,7 +220,7 @@ function actualPlan(start,capital){
   if(confirmed)nextBuy={asset:watch,budget:capital/5};
  }else if(state==='half'){
   title='下一步：赎回剩余'+ASSETS[asset]+'份额';
-  note='已赎回一半，第一笔卖单完成。下一步提交剩余份额的赎回，款项到账前这笔钱仍在途。';
+  note='已赎回一半。下一步赎回剩余份额，款项到账前仍在途。';
  }else if(state==='cleared'){
   title='下一步：申购'+ASSETS[target]+'第一笔';
   note='旧仓已全部赎回，不论款项是否到账，本轮都需要完成申购，预算约 '+fmt(capital/5)+' 元。'+
@@ -258,7 +258,7 @@ function swapTracker(state){
 function mode(){
  const actual=$('basis').value==='actual';
  $('actualFields').hidden=!actual;$('fundLabel').textContent=actual?'本轮起始资金（元）':'初始资金（元）';
- $('planHelp').textContent=actual?'按最新周收盘核对操作。赎回进度会一直保留，补录新一周也不会清空。设置仅存于本浏览器。':'从所选周空仓起步模拟。设置仅存于本浏览器。';
+ $('planHelp').textContent=actual?'按最新周收盘核对。设置仅存于本浏览器。':'从所选周空仓起步模拟。设置仅存于本浏览器。';
  $('capital').value=actual?(get('actual',{}).capital||10000):get('capital',10000);
  save('basis',$('basis').value);plan();
 }
@@ -330,9 +330,8 @@ function floatSummary(){
  const worstRound=rounds.reduce((a,b)=>b.h.risk.depth<a.h.risk.depth?b:a);
  const worstRoundFloat=rounds.reduce((a,b)=>b.h.float.depth<a.h.float.depth?b:a);
  const label=item=>'第 '+(item.j+1)+' 轮第 '+(item.s+1)+' 笔'+(item.h.float.date?' · '+item.h.float.date:'');
- box.innerHTML='<b>两套口径</b>：浮亏按买入本金，回撤按持有期高点。'+every.length+' 笔里最深浮亏 <strong>'+pct(worst.h.float.depth)+'</strong>（'+label(worst)+'），首周最深 <strong>'+pct(week.h.float.week.depth)+'</strong>（第 '+(week.j+1)+' 轮第 '+(week.s+1)+' 笔）。<br>'+
-  '按轮看账户：最大回撤 <strong>'+pct(worstRound.h.risk.depth)+'</strong>（第 '+(worstRound.j+1)+' 轮，'+worstRound.h.risk.peak+' → '+worstRound.h.risk.trough+'）；'+
-  '最大浮亏 <strong>'+pct(worstRoundFloat.h.float.depth)+'</strong>（第 '+(worstRoundFloat.j+1)+' 轮，'+worstRoundFloat.h.float.date+'）。';
+ box.innerHTML='<b>浮亏按本金 · 回撤按高点</b>　'+every.length+' 笔最深浮亏 <strong>'+pct(worst.h.float.depth)+'</strong>（'+label(worst)+'）'+
+  moreNote('首周最深浮亏 '+pct(week.h.float.week.depth)+'（第 '+(week.j+1)+' 轮第 '+(week.s+1)+' 笔）。按轮看账户：最大回撤 '+pct(worstRound.h.risk.depth)+'（第 '+(worstRound.j+1)+' 轮，'+worstRound.h.risk.peak+' → '+worstRound.h.risk.trough+'）；最大浮亏 '+pct(worstRoundFloat.h.float.depth)+'（第 '+(worstRoundFloat.j+1)+' 轮，'+worstRoundFloat.h.float.date+'）。');
 }
 $('orders').onclick=e=>{
  const risk=e.target.closest('button[data-risk-lot]');

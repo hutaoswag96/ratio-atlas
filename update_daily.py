@@ -11,7 +11,8 @@ from update_data import fetch
 ROOT = Path(__file__).resolve().parent
 
 weekly = json.loads((ROOT/'dist/weekly.js').read_text().split(' = ',1)[1].rstrip(';\n'))
-official = weekly[156:]
+# 全历史：日频从周线第一个共同交易周开始，和回测区间保持一致。
+official = weekly
 first = official[0][0]
 now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
 last = (now.date() if now.hour >= 16 else now.date()-dt.timedelta(days=1)).isoformat()

@@ -1,0 +1,57 @@
+name: Weekly bars
+
+# Friday 16:10 Asia/Shanghai (08:10 UTC) plus a Saturday retry.
+on:
+  schedule:
+    - cron: '10 8 * * 5'
+    - cron: '0 2 * * 6'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-bars
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Rebuild weekly.js from official closes
+        run: python update_data.py
+
+      - name: Commit to main
+        run: |
+          git config user.name "ratio-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/weekly.js
+          if git diff --cached --quiet; then
+            echo "weekly.js unchanged"
+            exit 0
+          fi
+          git commit -m "Refresh weekly bars through the latest Friday"
+          git push origin HEAD:main
+
+      - name: Publish to gh-pages
+        run: |
+          git fetch --depth=1 origin gh-pages
+          git worktree add /tmp/ghp origin/gh-pages --detach
+          cp dist/weekly.js /tmp/ghp/weekly.js
+          cd /tmp/ghp
+          git add weekly.js
+          if git diff --cached --quiet; then
+            echo "gh-pages unchanged"
+            exit 0
+          fi
+          git -c user.name=ratio-bot -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+            commit -m "Weekly bars through official closes"
+          git push origin HEAD:gh-pages

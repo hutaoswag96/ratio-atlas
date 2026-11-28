@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>创红比值 · 轮动执行台</title><link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="apple-touch-icon" href="favicon.png"><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-prices.js"></script><script defer src="daily-close.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f8f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#15181c" media="(prefers-color-scheme: dark)"><title>创红比值 · 轮动执行台</title><link rel="icon" type="image/svg+xml" href="favicon.svg"><link rel="apple-touch-icon" href="favicon.png"><link rel="stylesheet" href="brief.css"><link rel="stylesheet" href="workspace.css"><script defer src="daily-returns.js"></script><script defer src="weekly.js"></script><script defer src="engine.js"></script><script defer src="trends.js"></script><script defer src="plan-performance.js"></script><script defer src="daily-prices.js"></script><script defer src="daily-close.js"></script><script defer src="weekly-auto.js"></script><script defer src="execution.js"></script><script defer src="brief.js"></script></head><body>
 <header class="workspace-header">
   <div class="mast">
     <a class="brand" href="#top">
@@ -12,7 +12,7 @@
       <a href="#history"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 11a8 8 0 1 1 2 6M4 5v6h6m2-3v4l3 2"/></svg><span>历史复盘</span></a>
       <a href="#funds"><svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="2"/><path d="M4 10h16M8 15h3"/></svg><span>场外基金</span></a>
     </nav>
-    <div class="sidebar-links"><a href="#rules">交易规则</a><a href="#data">行情与补录</a></div>
+    <div class="sidebar-links"><a href="#rules">交易规则</a><a href="#data">行情来源</a></div>
   </div>
   <div class="workspace-bar"><div class="workspace-bar-inner"><a href="#top">我的投资工作台</a><span aria-hidden="true">/</span><strong id="active-section">本周判断</strong></div></div>
 </header>
@@ -132,7 +132,7 @@
  <p class="fine">跟踪对应指数的场外 ETF 联接基金，代码供核对；申购状态以销售平台为准。</p>
 </details>
 <details class="sheet guide" id="rules"><summary>交易规则</summary><ol class="rules"><li><b>每日看比值，周末看信号</b>日收盘低过下线关注创业板，高过上线关注红利，碰线也算；观察期从有效周收盘入区起算。</li><li><b>再等它相对转强</b>观察区最多 13 周。红利要等比值低于近 13 周均值，创业板要等高于均值；先到另一端就改看另一边。</li><li><b>一轮的钱分五份</b>空仓确认后下周收盘买第一份。每笔满 28 天后的首个周收盘出加仓信号，再下周收盘买入，同向无需重新触线。</li><li><b>换边时分两次卖</b>对侧确认后下周卖旧仓一半，再下周卖清，同时用新资金的 20% 买另一边。</li></ol></details>
-<details id="data" class="sheet"><summary>行情日期与周线补录</summary>
+<details id="data" class="sheet"><summary>行情来源与周线</summary>
 <p id="daily-detail" class="daily-detail" role="status"></p>
-<p>日收盘来自腾讯财经，打开页面自动更新。周线决定买卖，缺周时状态变「待补录」，按下方方式补录。</p><p>按时间顺序补录每个已结束交易周的四个收盘点位，遇节假日取当周最后交易日。</p><form id="append"><div class="form"><label>交易周末日期<input type="date" required id="newDay"></label><label>红利 000922<input required type="number" min=".01" step="any" id="p0"></label><label>创业板 399006<input required type="number" min=".01" step="any" id="p1"></label><label>红利全收益 H00922<input required type="number" min=".01" step="any" id="p2"></label><label>创业板全收益 399606<input required type="number" min=".01" step="any" id="p3"></label></div><button class="button">保存本周数据</button> <button type="button" id="undo">撤回最后一次补录</button></form><p id="notice" role="status"></p></details>
+<p>日收盘来自腾讯财经，打开页面自动更新。周线决定买卖，收盘后自动生成：价格与创业板全收益取真实收盘，红利全收益按价格指数折算，当晚由 GitHub Actions 用官方数据覆盖。</p><p>自动获取失败或需要覆盖时，按时间顺序补录每个已结束交易周的四个收盘点位，遇节假日取当周最后交易日。</p><form id="append"><div class="form"><label>交易周末日期<input type="date" required id="newDay"></label><label>红利 000922<input required type="number" min=".01" step="any" id="p0"></label><label>创业板 399006<input required type="number" min=".01" step="any" id="p1"></label><label>红利全收益 H00922<input required type="number" min=".01" step="any" id="p2"></label><label>创业板全收益 399606<input required type="number" min=".01" step="any" id="p3"></label></div><button class="button">保存本周数据</button> <button type="button" id="undo">撤回最后一次补录</button></form><p id="notice" role="status"></p></details>
 <footer>创红比值 <span>创业板指 / 中证红利 · 单边轮动</span></footer></main></body></html>

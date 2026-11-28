@@ -11,12 +11,13 @@ function signalPending(){return rows?Date.now()>=weekDeadline(rows[end][0]):fals
 function renderDataStatus(){
  if(!rows)return;
  const asof=rows[end][0],from=shiftDay(asof,3),to=shiftDay(asof,7),pending=signalPending();
+ const auto=typeof autoDates!=='undefined'&&autoDates.has(asof);
  const box=$('data-status');if(!box)return;
  box.dataset.tone=pending?'pending':'ready';
- $('status-pill').textContent=pending?'待补录':'可使用';
+ $('status-pill').textContent=pending?'待补录':auto?'自动':'可使用';
  $('status-text').textContent=pending?
   '判断沿用 '+asof+' 收盘 · 本周待补录；估值已跟到最近收盘'
-  :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to;
+  :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to+(auto?' · 当日自动生成':'');
 }
 function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){
  const items=[];
@@ -101,9 +102,15 @@ function commitBands(){
 function validRow(r){return Array.isArray(r)&&r.length===5&&/^\d{4}-\d\d-\d\d$/.test(r[0])&&r.slice(1).every(n=>Number.isFinite(n)&&n>0);}
 if(!Array.isArray(extra))extra=[];
 extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
+// 正式周线 > 手动补录 > 浏览器补齐；同日只保留一份，避免折算值覆盖官方数据。
+function mergeWeeks(...lists){
+ const byDay=new Map();
+ for(const list of lists)for(const row of list)byDay.set(row[0],row);
+ return [...byDay.values()].sort((a,b)=>a[0]<b[0]?-1:a[0]>b[0]?1:0);
+}
 function refresh(){
  applyBandPref();
- rows=[...weeklyData,...extra];bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
+ rows=mergeWeeks(typeof autoWeeks!=='undefined'?autoWeeks:[],weeklyData,extra);bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
  const m=bars[end];$('asof').textContent=rows[end][0];$('weekly-ratio').textContent=rows[end][0]+' · 比值 '+f(m.r)+(bandOverride?' · 手动线':'');$('lo').textContent='创业板线 '+f(m.low);$('hi').textContent='红利线 '+f(m.high);
  const span=m.high-m.low;$('pointer').style.left=Math.max(0,Math.min(99,20+60*(m.r-m.low)/span))+'%';
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
@@ -392,6 +399,7 @@ $('band-mode').onchange=()=>{
 };
 for(const id of ['band-scope','band-low','band-high'])$(id).onchange=commitBands;
 setupTrendCharts();renderFundList();refresh();mode();
+if(typeof refreshAutoWeeks==='function')refreshAutoWeeks();
 refreshDailyClose();
 addEventListener('focus', refreshDailyClose);
 setInterval(refreshDailyClose, 10 * 60 * 1000);
@@ -399,7 +407,7 @@ setInterval(refreshDailyClose, 10 * 60 * 1000);
 const navLinks=[...document.querySelectorAll('nav a')];
 function selectNav(hash){
  const active=navLinks.find(link=>link.hash===hash);
- $('active-section').textContent=active?.textContent.trim()||(hash==='#rules'?'交易规则':hash==='#data'?'行情与补录':'策略研究');
+ $('active-section').textContent=active?.textContent.trim()||(hash==='#rules'?'交易规则':hash==='#data'?'行情来源':'策略研究');
  for(const link of navLinks){
   if(link===active)link.setAttribute('aria-current','location');
   else link.removeAttribute('aria-current');

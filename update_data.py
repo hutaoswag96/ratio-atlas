@@ -40,9 +40,13 @@ def snapshot(end):
 
 
 if __name__ == '__main__':
-    # Use Friday's final data starting on Saturday (Shanghai time).
-    today = dt.datetime.now(dt.timezone(dt.timedelta(hours=8))).date()
-    end = today - dt.timedelta(days=(today.weekday()-5) % 7 + 1)
+    # Latest Friday whose 15:00 close has passed (Shanghai time).
+    now = dt.datetime.now(dt.timezone(dt.timedelta(hours=8)))
+    today = now.date()
+    friday = today - dt.timedelta(days=(today.weekday() - 4) % 7)
+    if friday == today and now.hour < 15:
+        friday -= dt.timedelta(days=7)
+    end = friday
     rows = snapshot(end.isoformat())
     if len(rows) < 750 or (end - dt.date.fromisoformat(rows[-1][0])).days > 14:
         raise ValueError('Incomplete weekly series')

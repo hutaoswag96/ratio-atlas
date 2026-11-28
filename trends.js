@@ -92,7 +92,7 @@ function refreshTrendQuotes(force=false) {
  }
  for (const year of years) {
   if (trendBands.has(year)) continue;
-  const history = rows.filter(row=>row[0]<year+'-01-01').map(row=>row[1]/row[2]).sort((a,b)=>a-b);
+  const history = rows.filter(row=>row[0]<year+'-01-01').map(row=>row[2]/row[1]).sort((a,b)=>a-b);
   trendBands.set(year,{low:quantile(history,.2),high:quantile(history,.8)});
  }
  $('chart-year').replaceChildren(new Option('选择年份', ''), ...years.map(year => new Option(year + ' 年', year)));
@@ -154,7 +154,7 @@ function normalizedPoint(day, column) {
 }
 
 function ratioAt(day) {
- return trendQuotes[day][1]/trendQuotes[day][2];
+ return trendQuotes[day][2]/trendQuotes[day][1];
 }
 
 function bandAt(day) {

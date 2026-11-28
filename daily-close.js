@@ -18,13 +18,13 @@ function dailyChartQuotes() {
 }
 
 function dailyZone(ratio, band) {
- if (ratio<=band.low) return 0;
- if (ratio>=band.high) return 1;
+ if (ratio<=band.low) return 1;
+ if (ratio>=band.high) return 0;
  return null;
 }
 
 function drawQuoteSparkline(prices) {
- const values = prices.map(([,red,growth])=>red/growth);
+ const values = prices.map(([,red,growth])=>growth/red);
  const min=Math.min(...values), max=Math.max(...values), span=max-min;
  const points=values.map((value,i)=>[5+158*i/Math.max(values.length-1,1),span?5+36*(max-value)/span:24]);
  const line=points.map(([x,y],i)=>(i?'L':'M')+x+' '+y).join(' ');
@@ -37,13 +37,13 @@ function drawQuoteSparkline(prices) {
 function showDailyClose() {
  const weekly = rows[end], latest = trendQuotes.at(-1);
  const [date,red,growth] = latest;
- const ratio = red/growth, change = $('daily-ratio-change');
+ const ratio = growth/red, change = $('daily-ratio-change');
  $('daily-asof').textContent = date;
  $('ratio').textContent = f(ratio);
  change.className = '';
  if (trendQuotes.length>1) {
   const [,previousRed,previousGrowth] = trendQuotes.at(-2);
-  const delta = ratio/(previousRed/previousGrowth)-1;
+  const delta = ratio/(previousGrowth/previousRed)-1;
   change.textContent = '较前一交易日 '+signedRate(delta);
   change.className = changeClass(delta);
  } else change.textContent = '收盘于 '+date;
@@ -52,11 +52,11 @@ function showDailyClose() {
  const observation = $('daily-observation');
  observation.querySelector('strong').textContent = side===null?'两线之间':ASSETS[side]+'观察区';
  const touch = trendQuotes.findLast(([day,a,b]) =>
-  day>weekly[0] && dailyZone(a/b,trendBands.get(day.slice(0,4)))!==null);
+  day>weekly[0] && dailyZone(b/a,trendBands.get(day.slice(0,4)))!==null);
  const context = observation.querySelector('span');
  if (touch) {
   const [day,a,b] = touch;
-  const touchedSide = dailyZone(a/b,trendBands.get(day.slice(0,4)));
+  const touchedSide = dailyZone(b/a,trendBands.get(day.slice(0,4)));
   context.textContent = side===null?'周线后曾入区 · '+day+' '+ASSETS[touchedSide]+' · 已退回区间':
    '最近触线 '+day+' · 等待周收盘确认';
  } else context.textContent = '买卖按周收盘确认';

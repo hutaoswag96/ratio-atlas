@@ -3,13 +3,13 @@
   --paper:#f5f6f3; --surface:#fff; --layer:#f3f6f0; --ink:#202d28; --muted:#59665e; --subtle:#869387;
   --nav:#fbfcfa; --brand:#21654f; --brand-hover:#174f3d; --selected:#e8f1e9;
   --line:#dce4db; --grid:#e5eae3; --field:#abb9ad; --trace:#153e32;
-  --up:#ac423e; --down:#22704d; --amber:#875b23; --low-line:#bb8881; --high-line:#7f9bb0; --blue:#396991;
+  --up:#ac423e; --down:#22704d; --amber:#875b23; --low-line:#7f9bb0; --high-line:#bb8881; --blue:#396991;
   --font:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",Arial,sans-serif;
   --num:Inter,"SFMono-Regular",Consolas,"Liberation Mono",monospace;
   --space:24px; --small-radius:8px;
 }
 @media(prefers-color-scheme:dark){
-  :root{color-scheme:dark;--paper:#121417;--surface:#191c20;--layer:#21252a;--ink:#eef0f3;--muted:#b4bac3;--subtle:#8e97a3;--nav:#15181c;--brand:#a2cdba;--brand-hover:#c2e5d3;--selected:#2c3438;--line:#363c44;--grid:#30353c;--field:#68727e;--trace:#d1d8df;--up:#ff9692;--down:#79d3a5;--amber:#e8b978;--low-line:#b2726c;--high-line:#84a7c7;--blue:#95bde2}
+  :root{color-scheme:dark;--paper:#121417;--surface:#191c20;--layer:#21252a;--ink:#eef0f3;--muted:#b4bac3;--subtle:#8e97a3;--nav:#15181c;--brand:#a2cdba;--brand-hover:#c2e5d3;--selected:#2c3438;--line:#363c44;--grid:#30353c;--field:#68727e;--trace:#d1d8df;--up:#ff9692;--down:#79d3a5;--amber:#e8b978;--low-line:#84a7c7;--high-line:#b2726c;--blue:#95bde2}
 }
 *{box-sizing:border-box}
 html{scroll-padding-top:76px}

@@ -51,7 +51,10 @@ function syncTrendControls() {
  const count = last - first + 1;
  $('chart-from').value = trendDates[first];
  $('chart-to').value = trendDates[last];
- $('chart-year').value = activeCalendarYear;
+ const yearSelect = $('chart-year');
+ const presets = { 1: '近一月', 12: '近一年', 36: '近三年', 0: '全历史' };
+ if (yearSelect.options[0]) yearSelect.options[0].textContent = presets[activePreset] ?? '自定义';
+ yearSelect.value = activeCalendarYear;
  $('chart-range-status').textContent = trendDates[first] + ' → ' + trendDates[last] + ' · ' + count + ' 个交易日';
  for (const button of $('ranges').querySelectorAll('button')) {
   button.setAttribute('aria-pressed', Number(button.dataset.n) === activePreset);
@@ -100,7 +103,7 @@ function refreshTrendQuotes(force=false) {
   if (limited && year !== limited) continue;
   trendBands.set(year,{low:bandOverride.low,high:bandOverride.high});
  }
- $('chart-year').replaceChildren(new Option('选择年份', ''), ...years.map(year => new Option(year + ' 年', year)));
+ $('chart-year').replaceChildren(new Option('全历史', ''), ...years.map(year => new Option(year + ' 年', year)));
  for (const input of [$('chart-from'), $('chart-to')]) {
   input.min = trendDates[0];
   input.max = trendDates.at(-1);
@@ -704,7 +707,10 @@ function bindTrendPlot(view) {
 
 function setupTrendCharts() {
  $('ranges').onclick = e => { if (e.target.matches('button[data-n]')) chooseRecent(Number(e.target.dataset.n)); };
- $('chart-year').onchange = () => { if ($('chart-year').value) chooseYear($('chart-year').value); };
+ $('chart-year').onchange = () => {
+  const year = $('chart-year').value;
+  if (year) chooseYear(year); else chooseRecent(0);
+ };
  $('chart-dates').onsubmit = e => {
   e.preventDefault();
   const from = $('chart-from').value, to = $('chart-to').value;
@@ -715,12 +721,20 @@ function setupTrendCharts() {
    return;
   }
   setTrendRange(first, last);
-  if (matchMedia('(max-width: 700px)').matches) $('chart-date-panel').open = false;
+  $('chart-date-panel').open = false;
  };
  $('zoom-in').onclick = () => zoomTrendWindow(true);
  $('zoom-out').onclick = () => zoomTrendWindow(false);
  $('pan-back').onclick = () => moveTrendWindow(-1);
  $('pan-forward').onclick = () => moveTrendWindow(1);
+ // 自选日期是浮层：点外部或按 Esc 收起
+ document.addEventListener('click', e => {
+  const panel = $('chart-date-panel');
+  if (panel.open && !panel.contains(e.target)) panel.open = false;
+ });
+ document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('chart-date-panel').open) $('chart-date-panel').open = false;
+ });
  $('cursor').oninput = () => selectTrendDay(Number($('cursor').value));
  const observer = new ResizeObserver(() => { if (trendRange) renderTrendCharts(); });
  bindLinkedReturns();

@@ -44,7 +44,7 @@
 </section>
 <section class="sheet" id="chart"><div class="heading"><div><h2>比值走势与买卖点</h2></div><div class="segments" id="ranges"><button data-n="1">近一月</button><button data-n="12">近一年</button><button data-n="36">近三年</button><button data-n="0" aria-pressed="true">全历史</button></div></div>
 <div class="timeline">
-  <label class="year-control">查看年份 <select id="chart-year"><option value="">选择年份</option></select></label>
+  <select id="chart-year" aria-label="查看年份" title="按年份查看"><option value="">全历史</option></select>
   <div class="segments" id="chart-controls" aria-label="移动及缩放时间范围">
     <button type="button" id="pan-back" aria-label="向更早日期移动" title="向更早日期移动">‹</button>
     <button type="button" id="zoom-in" aria-label="放大时间范围" title="放大时间范围">＋</button>
@@ -55,8 +55,9 @@
     <summary>自选日期</summary>
     <form id="chart-dates" aria-label="自选起止日期"><label>起始 <input type="date" id="chart-from" required></label><label>结束 <input type="date" id="chart-to" required></label><button>应用</button></form>
   </details>
+  <p class="range-meta" id="chart-range-status" role="status"></p>
+  <span class="range-hint hint-mouse">拖选可放大</span><span class="range-hint hint-touch">双指缩放 · 单指拖动</span>
 </div>
-<div class="range-meta"><p id="chart-range-status" class="chart-range-status" role="status"></p><span class="hint-mouse">拖选可放大</span><span class="hint-touch">双指缩放 · 单指拖动</span></div>
 <div class="legend"><span class="ratio-key">━ 日收盘比值</span><span class="ratio-key">◇ 所选日</span><span class="red">● 买红利</span><span class="blue">● 买创业板</span><span class="sell-key">▽ 卖一半</span><span class="sell-key">▼ 卖清</span><span>┄ 观察线</span></div><div class="plot-frame"><svg id="plot" role="img" aria-label="创业板指除以中证红利的日收盘比值、年度观察线及周线模拟买卖点"></svg><div id="ratio-selection" class="chart-selection" hidden></div><output id="plot-tip" aria-hidden="true" hidden></output></div><div class="scrub"><label for="cursor">查看交易日</label><input type="range" id="cursor"><output id="readout" for="cursor"></output></div><ul id="trade-readout" hidden aria-label="所选交易日的模拟成交"></ul><section class="index-panel" aria-labelledby="index-heading">
   <div class="index-title"><h3 id="index-heading">两只指数走势</h3><p class="fine">对数刻度 · 两线垂直间距即比值</p></div>
   <div class="legend"><span class="red">━ 中证红利 000922</span><span class="blue">┄ 创业板指 399006</span></div>

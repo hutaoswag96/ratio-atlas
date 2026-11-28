@@ -14,9 +14,9 @@ function renderDataStatus(){
  const auto=typeof autoDates!=='undefined'&&autoDates.has(asof);
  const box=$('data-status');if(!box)return;
  box.dataset.tone=pending?'pending':'ready';
- $('status-pill').textContent=pending?'待补录':auto?'自动':'可使用';
+ $('status-pill').textContent=pending?'待更新':auto?'自动':'可使用';
  $('status-text').textContent=pending?
-  '判断沿用 '+asof+' 收盘 · 本周待补录；估值已跟到最近收盘'
+  '判断沿用 '+asof+' 收盘 · 本周周线还没拿到，页面会自动重试；估值已跟到最近收盘'
   :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to+(auto?' · 当日自动生成':'');
 }
 function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){

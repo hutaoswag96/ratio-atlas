@@ -320,6 +320,14 @@ main.wrap { gap: 16px; padding-inline: clamp(20px, 3.3vw, 46px); }
 #plan-settings #position-fields { display: contents; }
 #plan-settings #position-fields[hidden] { display: none; }
 #plan-settings #actualFields .form { align-items: end; }
+#plan-settings .band-picker { margin: 12px 0 2px; padding: 10px 0 0; border: 0; border-top: 1px solid var(--line); min-width: 0; }
+#plan-settings .band-picker legend { padding: 0; font-size: 13px; color: var(--brand); }
+#plan-settings .band-picker legend .fine { margin-left: 6px; font-weight: 400; }
+#plan-settings .band-picker .form { margin: 6px 0 0; }
+#plan-settings .band-picker .form label { font-size: 13px; }
+#plan-settings .band-picker input:disabled { color: var(--muted); background: transparent; opacity: .75; }
+#plan-settings .band-picker[data-mode="fixed"] legend { color: var(--up); }
+#band-note { margin: 6px 0 4px; }
 @media (max-width: 700px) {
   #plan-settings { padding-inline: 10px; }
   #plan-setup-summary { margin-left: 0; }

@@ -57,18 +57,60 @@ function renderEvidence(title,items){
 const cachedDailyPrices=get('daily-price-series',[]);
 if(Array.isArray(cachedDailyPrices))liveDailyPrices=mergeDailyCloses([],cachedDailyPrices);
 let extra=get('rows',[]),rows,bars,model,end;
+const BAND_KEY='bands',trim3=n=>Number(n.toFixed(3));
+function bandPref(){
+ const stored=get(BAND_KEY,{mode:'auto'});
+ if(stored?.mode!=='fixed')return {mode:'auto'};
+ const low=Number(stored.low),high=Number(stored.high);
+ return low>0&&high>low?{mode:'fixed',low,high,scope:stored.scope==='current'?'current':'all'}:{mode:'auto'};
+}
+function applyBandPref(){
+ const pref=bandPref();
+ return setBandOverride(pref.mode==='fixed'?pref:null);
+}
+function syncBandControls(){
+ const picker=$('band-picker');if(!picker)return;
+ const pref=bandPref(),m=bars[end],note=$('band-note');
+ $('band-mode').value=pref.mode;
+ $('band-scope').value=pref.mode==='fixed'?pref.scope:'all';
+ picker.dataset.mode=pref.mode;
+ const low=pref.mode==='fixed'?pref.low:m.low,high=pref.mode==='fixed'?pref.high:m.high;
+ if(!['band-mode','band-scope','band-low','band-high'].includes(document.activeElement?.id)){
+  $('band-low').value=trim3(low);$('band-high').value=trim3(high);
+ }
+ for(const id of ['band-scope','band-low','band-high'])$(id).disabled=pref.mode!=='fixed';
+ if(pref.mode==='fixed'){
+  const trail=trendDaily?.nav?.length?trendDaily:null;
+  const total=(trail?trail.nav.at(-1):model.nav.at(-1))/10000-1;
+  const risk=trail?calculateDrawdowns(trail.nav,trail.dates).depth:model.draw;
+  const scope=pref.scope==='current'?'仅今年（'+rows[end][0].slice(0,4)+'）改线，往年仍按各自年度分位':'重算全部历史';
+  note.innerHTML='已按 <b>'+f(pref.low)+' / '+f(pref.high)+'</b> '+scope+'：'+model.rounds.length+' 轮，累计 <b class="'+changeClass(total)+'">'+(total>0?'+':'')+pct(total)+'</b>，最大回撤 '+pct(risk)+'。';
+ }else{
+  note.textContent='现用 '+rows[end][0].slice(0,4)+' 年分位线 '+f(m.low)+' / '+f(m.high)+'；改手动可固定一组线重算。';
+ }
+}
+function commitBands(){
+ const mode=$('band-mode').value;
+ if(mode==='fixed'){
+  const low=Number($('band-low').value),high=Number($('band-high').value);
+  if(!(low>0)||!(high>0)||!(high>low)){$('band-note').innerHTML='<b class="stale-warn">红利线要高于创业板线，且都大于 0。</b>';return;}
+  save(BAND_KEY,{mode:'fixed',low,high,scope:$('band-scope').value==='current'?'current':'all'});
+ }else save(BAND_KEY,{mode:'auto'});
+ refresh();
+}
 function validRow(r){return Array.isArray(r)&&r.length===5&&/^\d{4}-\d\d-\d\d$/.test(r[0])&&r.slice(1).every(n=>Number.isFinite(n)&&n>0);}
 if(!Array.isArray(extra))extra=[];
 extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
 function refresh(){
+ applyBandPref();
  rows=[...weeklyData,...extra];bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
- const m=bars[end];$('asof').textContent=rows[end][0];$('weekly-ratio').textContent=rows[end][0]+' · 比值 '+f(m.r);$('lo').textContent='创业板线 '+f(m.low);$('hi').textContent='红利线 '+f(m.high);
+ const m=bars[end];$('asof').textContent=rows[end][0];$('weekly-ratio').textContent=rows[end][0]+' · 比值 '+f(m.r)+(bandOverride?' · 手动线':'');$('lo').textContent='创业板线 '+f(m.low);$('hi').textContent='红利线 '+f(m.high);
  const span=m.high-m.low;$('pointer').style.left=Math.max(0,Math.min(99,20+60*(m.r-m.low)/span))+'%';
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
  const selected=$('start').value||get('start',rows[end][0]);
  refreshStartPicker(selected);
  save('start',$('start').value);
- $('undo').disabled=!extra.length;renderDataStatus();refreshTrendCharts();plan();history();showDailyClose();
+ $('undo').disabled=!extra.length;renderDataStatus();refreshTrendCharts();plan();history();showDailyClose();syncBandControls();
 }
 function refreshStartPicker(preferred) {
  const dates=rows.slice(START).map(row=>row[0]);
@@ -93,6 +135,7 @@ function plan(){
  const actual=$('basis').value==='actual', held=$('holding').value;
  const setup=[actual?'实际持仓核对':'按起点模拟', actual?(held===''?'现金':ASSETS[Number(held)]):rows[start][0]];
  if(capital>=1&&capital<=1e11)setup.push('¥'+planMoney.format(capital));
+ if(bandOverride)setup.push('手动线 '+f(bandOverride.low)+'/'+f(bandOverride.high)+(bandOverride.scope==='current'?'（仅今年）':''));
  $('plan-setup-summary').textContent=setup.join(' · ');
  if(!(capital>=1&&capital<=1e11)){clearPlanPerformance();body.textContent='请输入 1 至 1000 亿元之间的初始资金。';$('plan-evidence').replaceChildren();$('headline').dataset.tone='warning';$('headline').textContent='请核对初始资金';$('reason').textContent='有效金额用于计算每一笔。';return;}
  if(actual){clearPlanPerformance();actualPlan(start,capital);renderProjection();return;}
@@ -340,6 +383,14 @@ $('sold').value=SWAP_STATES.includes(actual.state)?actual.state:(actual.half?'ha
 $('basis').value=get('basis','model');$('basis').onchange=mode;
 for(const id of ['holding','filled','lastFill','sold'])$(id).onchange=()=>{if(id==='holding')$('sold').value='none';$('sold').value=SWAP_STATES.includes($('sold').value)?$('sold').value:($('sold').value==='1'?'half':'none');plan();};
 if($('basis').value==='actual')$('capital').value=actual.capital||10000;
+$('band-mode').onchange=()=>{
+ if($('band-mode').value==='fixed'){
+  const m=bars[end];
+  $('band-low').value=trim3(m.low);$('band-high').value=trim3(m.high);
+ }
+ commitBands();
+};
+for(const id of ['band-scope','band-low','band-high'])$(id).onchange=commitBands;
 setupTrendCharts();renderFundList();refresh();mode();
 refreshDailyClose();
 addEventListener('focus', refreshDailyClose);

@@ -605,3 +605,17 @@ details.fine p { margin: 4px 0 0; }
   #chart-dates input[type=date] { width: 100%; height: 38px; font-size: 16px; }
   #chart-dates button { grid-column: 1 / -1; height: 38px; margin: 0; }
 }
+
+/* 比值图纵轴改用对数刻度后的角标，说明这不是线性刻度 */
+.axis-note {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+  vertical-align: 3px;
+}

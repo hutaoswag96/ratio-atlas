@@ -213,6 +213,18 @@ function yAxisLog(values) {
  return { log: true, min, max, ticks: best ? best.ticks : [] };
 }
 
+// 比值图也用对数：0.3→0.4 是 +33%，0.7→0.8 只有 +14%，线性刻度会把上方空间放大三倍。
+// 刻度值仍按 0.1 取整（读者熟悉），只是位置按对数排，间距不等正是真实涨幅的差别。
+function yAxisLogRatio(values, preferredStep) {
+ const axis = yAxis(values, preferredStep);
+ const lo = Math.log10(Math.min(...values)), hi = Math.log10(Math.max(...values));
+ const pad = Math.max((hi - lo) * .02, .002);
+ const min = lo - pad, max = hi + pad;
+ // 只在真实数据范围内取刻度：0.2 与 0.9 这类远在天边的整十值会把上方挤成一团。
+ const ticks = axis.ticks.filter(value => Math.log10(value) > min && Math.log10(value) < max);
+ return { log: true, logValue: true, min, max, ticks: ticks.length > 1 ? ticks : axis.ticks, digits: axis.digits };
+}
+
 function renderTrendCharts() {
  const { first, last } = trendRange;
  const indices = Array.from({ length: last - first + 1 }, (_, j) => first + j);
@@ -226,17 +238,20 @@ function renderTrendCharts() {
    { values: indices.map(i => bandAt(i).high), color: 'var(--high-line)', step: true, dashed: true },
    { values: indices.map(i => ratioAt(i)), color: 'var(--ratio-ink)' }
   ];
-  const axis = view.index ? yAxisLog(series.flatMap(line => line.values)) : yAxis(series.flatMap(line => line.values), .1);
+  const axis = view.index ? yAxisLog(series.flatMap(line => line.values)) : yAxisLogRatio(series.flatMap(line => line.values), .1);
   const y = axis.log
    ? value => p.base - (p.base - view.top) * (Math.log10(value) - axis.min) / (axis.max - axis.min)
    : value => p.base - (p.base - view.top) * (value - axis.min) / (axis.max - axis.min);
-  view.geometry = p;
-  view.y = y;
-  let svg = axis.ticks.map(value =>
-   '<path d="M'+p.left+' '+y(value)+'H'+p.right+'" stroke="var(--grid)"/>'+
-   '<text x="'+(p.left-7)+'" y="'+(y(value)+4)+'" text-anchor="end">'+
-   (axis.log?logFormat.format(value):Number(value.toFixed(axis.digits)))+'</text>'
-  ).join('');
+ view.geometry = p;
+ view.y = y;
+ const tickText = value => axis.logValue
+  ? Number(value.toFixed(axis.digits))
+  : axis.log ? logFormat.format(value) : Number(value.toFixed(axis.digits));
+ let svg = axis.ticks.map(value =>
+  '<path d="M'+p.left+' '+y(value)+'H'+p.right+'" stroke="var(--grid)"/>'+
+  '<text x="'+(p.left-7)+'" y="'+(y(value)+4)+'" text-anchor="end">'+
+  tickText(value)+'</text>'
+ ).join('');
   for (const line of series) {
    const d = line.values.map((value,j) => j && line.step ?
     'H'+p.x(first+j)+'V'+y(value) : (j ? 'L' : 'M')+p.x(first+j)+' '+y(value)).join(' ');

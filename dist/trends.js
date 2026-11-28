@@ -314,7 +314,7 @@ function renderLinkedReturns() {
  const period = $('linked-return-period'), worst=$('linked-worst-draw'), scrub=$('linked-day');
  const context=$('linked-return-context');
  context.textContent=(usePlan?'执行单 · '+rows[planDaily.start][0]+' 起 ¥'+planMoney.format(planDaily.capital):'完整策略 · 1 万元起')+
-  ' · 收益按区间首日、回撤按区间高点';
+  ' · 收益按首日 · 回撤按高点';
  dailyWindow = null;
  plot.el.setAttribute('viewBox', '0 0 '+plot.width+' '+plot.height);
  const labels = trendAxisLabels(plot);

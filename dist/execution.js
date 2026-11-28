@@ -56,13 +56,13 @@ function renderExecution(container, held, stage, nextBuy, actual=false, state='n
  }
  if (!orders.length) {
   if (state === 'pending') {
-   container.insertAdjacentHTML('beforeend','<p class="settle-note">申购已提交，等销售平台确认份额和成交净值。确认后把持仓切换为新资产、已买笔数改为 1，换仓进度改回「旧仓未动」。</p>');
+   container.insertAdjacentHTML('beforeend','<p class="settle-note">申购已提交，等平台确认份额。确认后把持仓切到新资产、笔数改为 1、换仓进度改回「旧仓未动」。</p>');
    return;
   }
   if (held !== null) {
    const other = 1-held;
-   const threshold = other === 1 ? '进入高位观察区，观察期内比值低于 13 周均值' : '进入低位观察区，观察期内比值高于 13 周均值';
-   container.insertAdjacentHTML('beforeend', '<p class="hold-trigger">换仓条件 · '+ASSETS[other]+threshold+'。</p>');
+   const threshold = other === 1 ? '创业板入区，且周收盘高于 13 周均值' : '红利入区，且周收盘低于 13 周均值';
+   container.insertAdjacentHTML('beforeend', '<p class="hold-trigger">换仓条件 · '+threshold+'。</p>');
   }
   return;
  }
@@ -77,7 +77,7 @@ function renderExecution(container, held, stage, nextBuy, actual=false, state='n
    <div class="order-fund">${fundLabel}</div>
   </li>`;
  }).join('');
- const settlement = actual?'以销售平台显示的申请受理、净值确认和到账时间为准。':'场外实际换仓时，等旧基金赎回款可用后再申购新基金。';
+ const settlement = actual?'以平台受理与净值确认为准。':'等旧基金赎回款可用后再申购新基金。';
  const note = (stage || state !== 'none') ? '<p class="meta">'+settlement+'</p><h4 class="old-positions">旧仓建仓记录</h4>' : '';
  container.querySelector('.steps').insertAdjacentHTML('beforebegin', '<section class="execution-orders"><h4>操作顺序</h4><ol>'+list+'</ol>'+note+'</section>');
 }

@@ -56,7 +56,7 @@ function renderPlanPerformance(simulation, start, capital) {
    <div><span>账户总值</span><strong>¥${planMoney.format(value)}</strong></div>
    <div><span>最大周线回撤</span><strong class="${changeClass(simulation.draw)}">${pct(simulation.draw)}</strong></div>
   </div>
-  <p class="meta fine">${planMoney.format(capital)} 元起步 · ${note} 信号仍按 ${rows[end][0]} 周线。</p>
+  <p class="meta fine">${planMoney.format(capital)} 元起步 · 信号按 ${rows[end][0]} 周线${moreNote(note)}</p>
   ${daily?'<a class="plan-history-link" href="#linked-performance" data-performance="plan">查看该起点的收益与回撤</a>':'<p class="meta">这个起点暂时没有日度估值。</p>'}
   ${noTrade && start!==START?'<button type="button" id="full-plan">查看完整历史模拟</button>':''}`;
  const full = $('full-plan');
@@ -163,7 +163,7 @@ function renderPlanLots(simulation, start) {
  });
  const totalLots = rounds.reduce((sum,round)=>sum+round.lots.length,0);
  container.innerHTML = '<details class="plan-lot-list" '+(expanded?'open':'')+'><summary>逐笔收益与回撤 <span>'+
-  totalLots+' 笔</span></summary><p class="meta">最大浮亏以买入本金为基准，最大回撤以持有期最高点为基准；点开可查看曲线与峰谷日期。</p>'+
+  totalLots+' 笔</span></summary><p class="meta">浮亏按本金 · 回撤按高点 · 点开看曲线与峰谷日期。</p>'+
   roundsHTML.reverse().join('')+'</details>';
  const list = container.querySelector('.plan-lot-list');
  for (const round of rounds) for (const lot of round.lots) {
@@ -226,8 +226,7 @@ function renderLotChart(panel, round, lot) {
   <div class="lot-legends"><span>━ 收益率</span><span>━ 回撤</span><span>┈ 成本线</span></div>
   <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="该笔买入后的收益率及回撤曲线">
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
-  </svg></div>
-  <p class="meta">部分卖出后，已回收现金与剩余持仓一起计入该笔收益。</p>`;
+  </svg></div>`;
 }
 
 function renderRoundChart(panel, sim, base, index) {
@@ -274,8 +273,7 @@ function renderRoundChart(panel, sim, base, index) {
   <div class="lot-legends"><span>━ 账户收益</span><span>━ 账户回撤</span><span>┈ 起步线</span></div>
   <div class="lot-chart-scroll"><svg viewBox="0 0 ${width} ${height}" role="img" aria-label="本轮账户收益与回撤曲线">
    <g fill="var(--muted)" font-family="Inter, Arial, sans-serif" font-size="11">${svg}</g>
-  </svg></div>
-  <p class="meta">已卖出的部分按成交价转为现金，仍计入账户。</p>`;
+  </svg></div>`;
 }
 
 function roundHistory(sim, base, index) {

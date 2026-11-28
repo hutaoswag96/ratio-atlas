@@ -619,3 +619,40 @@ details.fine p { margin: 4px 0 0; }
   color: var(--muted);
   vertical-align: 3px;
 }
+
+/* ---------- 折叠说明：正文只留结论，解释放在 ＊ 后面 ---------- */
+button.note-mark {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  min-height: 17px;
+  margin: -2px 0 -2px 5px;
+  padding: 0 3px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--layer);
+  color: var(--muted);
+  font: 600 11px/1 var(--font);
+  vertical-align: 2px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+button.note-mark:hover { color: var(--brand); border-color: var(--brand); }
+button.note-mark[aria-expanded=true] { color: var(--brand); border-color: var(--brand); background: var(--selected); }
+.note-body {
+  display: block;
+  margin: 7px 0 3px;
+  padding: 8px 11px;
+  border-left: 2px solid var(--line);
+  border-radius: 0 6px 6px 0;
+  background: var(--layer);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.note-body b { color: var(--ink); font-weight: 620; }
+.note-body > b:first-child { margin-right: 2px; }
+@media (max-width: 700px), (pointer: coarse) {
+  button.note-mark { min-width: 22px; width: auto; height: 22px; min-height: 22px; padding: 0 5px; font-size: 12px; vertical-align: 0; }
+}

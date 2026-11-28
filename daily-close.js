@@ -98,6 +98,8 @@ async function refreshDailyClose() {
   const previous = liveDailyPrices.at(-1)?.[0] ?? '';
   liveDailyPrices = mergeDailyCloses(liveDailyPrices, common.filter(row=>row[0]>snapshotEnd));
   save('daily-price-series',liveDailyPrices);
+  // A closed week is enough for the signal, so fill the newest weekly bar first.
+  if (typeof refreshAutoWeeks === 'function') await refreshAutoWeeks();
   const advanced = (liveDailyPrices.at(-1)?.[0] ?? '') !== previous;
   if (advanced) {
    // New closes roll the valuation forward; rebuild the panels that quote it.

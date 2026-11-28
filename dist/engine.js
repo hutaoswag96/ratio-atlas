@@ -3,15 +3,16 @@ const ASSETS=['中证红利','创业板指'], START=156, FEE=.001, DAY=86400000;
 const elapsed=(a,b)=>(Date.parse(a)-Date.parse(b))/DAY;
 function quantile(sorted,p){const n=(sorted.length-1)*p,j=Math.floor(n);return sorted[j]+(n-j)*(sorted[Math.min(j+1,sorted.length-1)]-sorted[j]);}
 function market(rows){
- const ratios=rows.map(r=>r[1]/r[2]);let year,low,high;
+ const ratios=rows.map(r=>r[2]/r[1]);let year,low,high;
  return rows.map((row,i)=>{
   if(i<START)return null;
   if(row[0].slice(0,4)!==year){
    year=row[0].slice(0,4);const history=ratios.slice(0,i).sort((a,b)=>a-b);
    low=quantile(history,.2);high=quantile(history,.8);
   }
+  // Growth/red: the low band means growth is cheap, the high band means red is.
   const r=ratios[i],avg=ratios.slice(i-12,i+1).reduce((a,b)=>a+b)/13;
-  return {r,avg,low,high,zone:r<=low?0:r>=high?1:null};
+  return {r,avg,low,high,zone:r<=low?1:r>=high?0:null};
  });
 }
 function simulate(rows,bars,start,capital=10000){
@@ -41,7 +42,7 @@ function simulate(rows,bars,start,capital=10000){
   const value=cash+(side===null?0:units*row[3+side]);nav.push(value);positions.push({cash,side,units});peak=Math.max(peak,value);draw=Math.min(draw,value/peak-1);orders=[];
   if(committed!==null){orders=[{kind:'sell',asset:side,part:1},{kind:'buy',asset:committed}];committed=null;continue;}
   if(m.zone!==null){watch=m.zone;touch=i;}
-  if(i-touch<13 && (watch===0?m.r>m.avg:m.r<m.avg))regime=watch;
+  if(i-touch<13 && (watch===0?m.r<m.avg:m.r>m.avg))regime=watch;
   if(regime===null)continue;
   if(side!==null && side!==regime){orders=[{kind:'sell',asset:side,part:.5}];committed=regime;}
   else if(side===null || (count<5 && elapsed(row[0],rows[lastBuy][0])>=28))orders=[{kind:'buy',asset:regime}];

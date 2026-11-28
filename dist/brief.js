@@ -24,14 +24,14 @@ function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){
   items.push({label:'入区',ok:false,detail:'比值 '+f(r)+' 在 '+f(low)+' 与 '+f(high)+' 两线之间'});
  }else{
   const tb=bars[touch];
-  items.push({label:'入区',ok:true,detail:rows[touch][0]+' 周收盘 · 比值 '+f(tb.r)+' '+(watch===0?'≤ 红利线 ':'≥ 创业板线 ')+f(watch===0?tb.low:tb.high)+' · 观察'+ASSETS[watch]});
+  items.push({label:'入区',ok:true,detail:rows[touch][0]+' 周收盘 · 比值 '+f(tb.r)+' '+(watch===0?'≥ 红利线 ':'≤ 创业板线 ')+f(watch===0?tb.high:tb.low)+' · 观察'+ASSETS[watch]});
  }
  const weeks=watch===null?null:end-touch+1;
  const watchValid=watch!==null&&weeks<=13;
- const confirmed=watchValid&&(watch===0?r>avg:r<avg);
+ const confirmed=watchValid&&(watch===0?r<avg:r>avg);
  if(watch===null)items.push({label:'转强确认',ok:false,detail:'未入区，13 周均值条件不启用'});
  else if(weeks>13)items.push({label:'转强确认',ok:false,detail:'观察期已满 13 周，需要重新入区'});
- else items.push({label:'转强确认',ok:confirmed,detail:'比值 '+f(r)+' 需'+(watch===0?'高于':'低于')+' 13 周均值 '+f(avg)+' · 观察期第 '+weeks+'/13 周'});
+ else items.push({label:'转强确认',ok:confirmed,detail:'比值 '+f(r)+' 需'+(watch===0?'低于':'高于')+' 13 周均值 '+f(avg)+' · 观察期第 '+weeks+'/13 周'});
  if(side===null||!count)items.push({label:'买入间隔',ok:false,detail:'首笔无需等待 28 天；仍须先入区并完成转强确认'});
  else if(count>=5)items.push({label:'买入间隔',ok:true,detail:'本轮五笔已买完，接下来只等对侧换仓'});
  else{
@@ -62,7 +62,7 @@ if(!Array.isArray(extra))extra=[];
 extra=extra.filter(validRow).filter(r=>r[0]>weeklyData.at(-1)[0]);
 function refresh(){
  rows=[...weeklyData,...extra];bars=market(rows);end=rows.length-1;model=simulate(rows,bars,START);
- const m=bars[end];$('asof').textContent=rows[end][0];$('weekly-ratio').textContent=rows[end][0]+' · 比值 '+f(m.r);$('lo').textContent='红利线 '+f(m.low);$('hi').textContent='创业板线 '+f(m.high);
+ const m=bars[end];$('asof').textContent=rows[end][0];$('weekly-ratio').textContent=rows[end][0]+' · 比值 '+f(m.r);$('lo').textContent='创业板线 '+f(m.low);$('hi').textContent='红利线 '+f(m.high);
  const span=m.high-m.low;$('pointer').style.left=Math.max(0,Math.min(99,20+60*(m.r-m.low)/span))+'%';
  $('average').textContent='13 周均值 '+f(m.avg)+'　·　'+(m.zone===null?'两线之间':ASSETS[m.zone]+'观察区');
  const selected=$('start').value||get('start',rows[end][0]);
@@ -127,14 +127,14 @@ function renderProjection(){
  const panel=$('projection');
  const priceData=dailyChartQuotes();
  if(priceData.length<61||!bars[end]){panel.innerHTML='';return;}
- const latest=priceData.at(-1),ratio=latest[1]/latest[2],bar=bars[end];
+ const latest=priceData.at(-1),ratio=latest[2]/latest[1],bar=bars[end];
  const holding=$('basis').value==='actual'?
   ($('holding').value===''?null:Number($('holding').value)):model.side;
  const nextAsset=holding===null?null:1-holding;
- const side=nextAsset??(Math.abs(ratio-bar.low)<=Math.abs(bar.high-ratio)?0:1);
- const boundary=side===0?bar.low:bar.high;
+ const side=nextAsset??(Math.abs(ratio-bar.low)<=Math.abs(bar.high-ratio)?1:0);
+ const boundary=side===0?bar.high:bar.low;
  const dailyMoves=priceData.slice(-61).map((row,i,window)=>i===0?null:
-  Math.abs(Math.log(row[1]/row[2])-Math.log(window[i-1][1]/window[i-1][2]))).filter(Number.isFinite);
+  Math.abs(Math.log(row[2]/row[1])-Math.log(window[i-1][2]/window[i-1][1]))).filter(Number.isFinite);
  const dailyMove=dailyMoves.reduce((sum,value)=>sum+value,0)/dailyMoves.length;
  const touch=Math.abs(Math.log(boundary/ratio));
  const confirmation=Math.abs(Math.log(bar.avg/boundary));
@@ -145,11 +145,11 @@ function renderProjection(){
  const daysText=sessions===0?'观察线已触及':`约 ${lowDays}–${highDays} 个交易日`;
  const weeksText=sessions===0?'等待周收盘确认':`约 ${Math.max(1,Math.ceil(lowDays/5))}–${Math.max(1,Math.ceil(highDays/5))} 周`;
  const moveText=value=>value===0?'已触及':pct(value);
- const confirmationText=side===0?'触线后，比值还需周线收复 13 周均线确认红利':'触线后，比值还需周线回落至 13 周均线下确认创业板';
+ const confirmationText=side===0?'触线后，比值还需周线跌到 13 周均线下方确认红利':'触线后，比值还需周线升到 13 周均线上方确认创业板';
  const nextText=nextAsset===null?'按较近的观察线':`候选：${ASSETS[nextAsset]}`;
  panel.innerHTML='<div class="projection-head"><h3>情景推演</h3><span>'+nextText+' · 估算</span></div>'+
-  '<div class="projection-values"><div><span>到红利线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`降 ${moveText(lowerDistance)}`)+'</strong></div>'+
-  '<div><span>到创业板线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`升 ${moveText(upperDistance)}`)+'</strong></div>'+
+  '<div class="projection-values"><div><span>到创业板线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`降 ${moveText(lowerDistance)}`)+'</strong></div>'+
+  '<div><span>到红利线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`升 ${moveText(upperDistance)}`)+'</strong></div>'+
   '<div><span>候选换仓的粗略时间</span><strong>'+daysText+' · '+weeksText+'</strong></div></div>'+
   '<p class="projection-note fine">'+confirmationText+'。</p>'+
   '<details class="projection-how"><summary>估算口径</summary><p>按近 60 个交易日比值平均波动折算，假设波动延续；观察线全年固定，实际可能更快、更慢或始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p></details>';
@@ -164,7 +164,7 @@ function actualPlan(start,capital){
  let touch=end;
  while(touch>=Math.max(start,end-12)&&bars[touch].zone===null)touch--;
  const watch=touch>=Math.max(start,end-12)?bars[touch].zone:null;
- const confirmed=watch!==null&&(watch===0?m.r>m.avg:m.r<m.avg);
+ const confirmed=watch!==null&&(watch===0?m.r<m.avg:m.r>m.avg);
  const retreated=state!=='none'&&!confirmed;
  let title,note,nextBuy=null;
  if(asset===null){

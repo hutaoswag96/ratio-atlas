@@ -18,6 +18,8 @@ function renderDataStatus(){
  $('status-text').innerHTML=pending?
   '判断沿用 '+asof+' 收盘 · 周线待更新'+moreNote('本周周线还没拿到，页面会自动重试；估值已跟到最近收盘。')
   :'周线 '+asof+' 已收盘 · 指令适用 '+from+' 至 '+to;
+ const win=$('banner-window');
+ if(win)win.textContent=pending?asof+' 起沿用':from+' 至 '+to;
 }
 function evidenceItems({watch,touch,r,avg,low,high,side,count,lastBuyDay}){
  const items=[];
@@ -198,8 +200,7 @@ function renderProjection(){
   '<div class="projection-values"><div><span>到创业板线 '+f(bar.low)+'</span><strong>'+(lowerDistance===0?'已触及':`降 ${moveText(lowerDistance)}`)+'</strong></div>'+
   '<div><span>到红利线 '+f(bar.high)+'</span><strong>'+(upperDistance===0?'已触及':`升 ${moveText(upperDistance)}`)+'</strong></div>'+
   '<div><span>候选换仓的粗略时间</span><strong>'+daysText+' · '+weeksText+'</strong></div></div>'+
-  '<p class="projection-note fine">确认条件：'+confirmationText+'。</p>'+
-  '<details class="projection-how"><summary>估算口径</summary><p>按近 60 个交易日比值平均波动折算，假设波动延续；观察线全年固定，实际可能更快、更慢或始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。</p></details>';
+  '<p class="projection-note fine">确认条件：'+confirmationText+'。'+moreNote('按近 60 个交易日比值平均波动折算，假设波动延续；观察线全年固定，实际可能更快、更慢或始终不到。日线只供观察，实际买卖仍以周线确认和场外基金受理为准。')+'</p>';
 }
 function actualPlan(start,capital){
  const raw=$('holding').value,asset=raw===''?null:Number(raw),filled=asset===null?0:Number($('filled').value);
@@ -399,38 +400,24 @@ refreshDailyClose();
 addEventListener('focus', refreshDailyClose);
 setInterval(refreshDailyClose, 10 * 60 * 1000);
 
-const navLinks=[...document.querySelectorAll('nav a')];
-function selectNav(hash){
- const active=navLinks.find(link=>link.hash===hash);
- $('active-section').textContent=active?.textContent.trim()||(hash==='#rules'?'交易规则':hash==='#data'?'行情来源':'策略研究');
- for(const link of navLinks){
-  if(link===active)link.setAttribute('aria-current','location');
-  else link.removeAttribute('aria-current');
+// 视图切换与锚点跳转由 shell.js 接管，这里只处理需要展开的折叠块
+function expandHashTarget(hash){
+ const id=String(hash||'').replace(/^#\/?/,'');
+ if(!id)return;
+ const el=$(id);
+ if(el&&'open' in el)el.open=true;
+ if(id.startsWith('fund-')){
+  const funds=$('funds');
+  if(funds&&'open' in funds)funds.open=true;
  }
 }
-function visibleSection(){
- if(window.scrollY<12){selectNav('#top');return;}
- const ids=['plan','chart','history','funds','rules','data'];
- const anchorY=innerHeight*.34;
- const current=ids.findLast(id=>$(id).getBoundingClientRect().top<=anchorY);
- selectNav(current?'#'+current:'#top');
-}
-addEventListener('scroll',visibleSection,{passive:true});
-function openHashTarget(){
- const id=location.hash.slice(1);
- if(id==='data'||id==='funds'||id==='rules')$(id).open=true;
- if(id.startsWith('fund-'))$('funds').open=true;
-}
-addEventListener('hashchange',()=>{selectNav(location.hash);openHashTarget();});
-visibleSection();
-openHashTarget();
+addEventListener('hashchange',()=>expandHashTarget(location.hash));
+expandHashTarget(location.hash);
 
 document.addEventListener('click',e=>{
  const a=e.target.closest('a[href^="#"]');
  if(!a)return;
- const id=a.getAttribute('href').slice(1);
- if(id==='data'||id==='funds'||id==='rules')$(id).open=true;
- else if(id.startsWith('fund-'))$('funds').open=true;
+ expandHashTarget(a.getAttribute('href'));
 });
 
 const mobileLayout = matchMedia('(max-width: 700px)');

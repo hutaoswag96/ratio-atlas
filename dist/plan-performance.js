@@ -182,7 +182,7 @@ function renderPlanLots(simulation, start) {
 function renderLotChart(panel, round, lot) {
  const {points:data,risk,float,useDaily,through}=lotHistory(round,lot);
  const plots = [
-  {key:'gain', label:'收益率', color:'var(--brand)'},
+  {key:'gain', label:'收益率', color:'var(--account-ink)'},
   {key:'draw', label:'回撤', color:'var(--amber)'}
  ];
  const width = Math.max(218, panel.clientWidth - 16), height = 184, left = 43, right = width-9;
@@ -232,7 +232,7 @@ function renderLotChart(panel, round, lot) {
 function renderRoundChart(panel, sim, base, index) {
  const {points, risk, float, invested, useDaily, through, startValue} = roundHistory(sim, base, index);
  const plots = [
-  {key:'gain', label:'账户收益', color:'var(--brand)'},
+  {key:'gain', label:'账户收益', color:'var(--account-ink)'},
   {key:'draw', label:'账户回撤', color:'var(--amber)'}
  ];
  const width = Math.max(218, panel.clientWidth - 16), height = 184, left = 43, right = width-9;

@@ -90,6 +90,7 @@ tbody tr:hover td{background:var(--layer)}tr:has(.selected) td{background:var(--
 .index-readout{margin:0;padding:6px 10px;background:var(--layer);font-variant-numeric:tabular-nums}
 .plot-frame>output{position:absolute;pointer-events:none;white-space:pre-line;border:1px solid var(--field);border-left:2px solid var(--brand);background:var(--surface);color:var(--ink);padding:6px 10px;font:13px/1.6 var(--num);z-index:1;max-width:100%}
 .chart-selection{position:absolute;pointer-events:none;background:color-mix(in srgb,var(--brand) 12%,transparent);border-inline:1px solid var(--brand)}
+.h-label{font:11px/1 var(--num);paint-order:stroke;stroke:var(--surface);stroke-width:3px;stroke-linejoin:round}
 
 @media(max-width:700px){
   .timeline{gap:8px}

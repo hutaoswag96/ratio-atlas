@@ -231,8 +231,8 @@ function renderTrendCharts() {
  for (const view of chartViews) {
   const p = makePlot(view);
   const series = view.index ? [
-   { values: indices.map(i => trendQuotes[i][1]), color: 'var(--up)' },
-   { values: indices.map(i => trendQuotes[i][2]), color: 'var(--blue)', dashed: true }
+   { values: indices.map(i => trendQuotes[i][1]), color: 'var(--asset-red)' },
+   { values: indices.map(i => trendQuotes[i][2]), color: 'var(--asset-blue)', dashed: true }
   ] : [
    { values: indices.map(i => bandAt(i).low), color: 'var(--low-line)', step: true, dashed: true },
    { values: indices.map(i => bandAt(i).high), color: 'var(--high-line)', step: true, dashed: true },
@@ -267,8 +267,8 @@ function renderTrendCharts() {
   svg += trendAxisLabels(p);
   // 选中日的十字准星：竖线跟到横轴，横向虚线标出该日的取值。
   const cross = view.index
-   ? '<line stroke="var(--up)" stroke-dasharray="3 3" stroke-opacity=".6"/><line stroke="var(--blue)" stroke-dasharray="3 3" stroke-opacity=".6"/>'+
-     '<text class="h-label" fill="var(--up)" text-anchor="end"/><text class="h-label" fill="var(--blue)" text-anchor="end"/>'
+   ? '<line stroke="var(--asset-red)" stroke-dasharray="3 3" stroke-opacity=".6"/><line stroke="var(--asset-blue)" stroke-dasharray="3 3" stroke-opacity=".6"/>'+
+     '<text class="h-label" fill="var(--asset-red)" text-anchor="end"/><text class="h-label" fill="var(--asset-blue)" text-anchor="end"/>'
    : '<line stroke="var(--subtle)" stroke-dasharray="3 3"/><text class="h-label" fill="var(--muted)" text-anchor="end"/>';
   p.el.setAttribute('viewBox', '0 0 '+p.width+' '+p.height);
   p.el.innerHTML = '<g font-family="Inter, Arial, sans-serif" font-size="12" fill="var(--muted)">'+svg+
@@ -444,7 +444,7 @@ function tradeMarkers(plot, y, first, last) {
   const day = trendDates.indexOf(date), cx = plot.x(day), cy = y(ratioAt(day));
   if (trade.kind === 'buy') {
    svg += '<circle data-day="'+day+'" cx="'+cx+'" cy="'+cy+'" r="3.7" fill="'+
-    (trade.asset?'var(--blue)':'var(--up)')+'" stroke="var(--surface)" stroke-width="1"/>';
+    (trade.asset?'var(--asset-blue)':'var(--asset-red)')+'" stroke="var(--surface)" stroke-width="1"/>';
    continue;
   }
   const full = trade.part === 1, tip = full ? 30 : 15;
